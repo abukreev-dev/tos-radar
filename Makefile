@@ -1,0 +1,29 @@
+PYTHON ?= python3.12
+VENV ?= .venv
+PIP := $(VENV)/bin/pip
+PY := $(VENV)/bin/python
+
+.PHONY: install init run test lint report-open
+
+install: $(VENV)/bin/python
+
+$(VENV)/bin/python: requirements.txt
+	$(PYTHON) -m venv $(VENV)
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
+	$(PY) -m playwright install chromium
+
+init: install
+	$(PY) -m tos_radar.cli init
+
+run: install
+	$(PY) -m tos_radar.cli run
+
+test: install
+	$(PY) -m unittest discover -s tests -p "test_*.py" -v
+
+lint: install
+	$(PY) -m ruff check tos_radar tests
+
+report-open: install
+	$(PY) -m tos_radar.cli report-open
