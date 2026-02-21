@@ -243,6 +243,18 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             HTTPStatus.UNAUTHORIZED,
             {"error": exc.code, "message": str(exc)},
         )
+    except TimeoutError:
+        return _json(
+            start_response,
+            HTTPStatus.GATEWAY_TIMEOUT,
+            {"error": "UPSTREAM_TIMEOUT", "message": "Upstream timeout while processing request."},
+        )
+    except ConnectionError:
+        return _json(
+            start_response,
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {"error": "UPSTREAM_UNAVAILABLE", "message": "Upstream service is unavailable."},
+        )
     except ValueError as exc:
         return _json(
             start_response,
