@@ -48,6 +48,7 @@ Health-check:
 - `POST /api/v1/account/soft-delete/start`
 - `POST /api/v1/account/soft-delete/restore`
 - `GET /api/v1/account/access-state`
+- `GET /api/v1/billing/plan`
 
 Авторизация (MVP):
 - Для защищенных endpoint'ов обязателен заголовок `X-Session-Id`.
@@ -146,6 +147,8 @@ https://example.org/tos.pdf
 - `MARIADB_DATABASE` (по умолчанию `tos_radar`)
 - `MARIADB_USER` (по умолчанию `tos_radar`)
 - `MARIADB_PASSWORD` (по умолчанию пусто)
+- `BILLING_PLAN_DEFAULT` (по умолчанию `FREE`, допустимо: `FREE|PAID_30|PAID_100`)
+- `BILLING_PLAN_OVERRIDES_JSON` (по умолчанию пусто, формат: `{"tenant:user":"PAID_30"}`)
 
 ## Поведение режимов
 

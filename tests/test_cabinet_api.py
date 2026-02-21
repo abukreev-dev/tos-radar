@@ -233,6 +233,23 @@ class CabinetApiTests(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(body["error"], "SESSION_REQUIRED")
 
+    def test_get_billing_plan_endpoint(self) -> None:
+        with patch("tos_radar.cabinet_api.get_billing_plan", return_value="PAID_30"), patch(
+            "tos_radar.cabinet_api.is_session_active",
+            return_value=True,
+        ), patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type("A", (), {"mode": "FULL_ACCESS"})(),
+        ):
+            status, body = _call(
+                "GET",
+                "/api/v1/billing/plan",
+                query="tenant_id=t1&user_id=u1",
+                headers={"X-Session-Id": "s1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["plan_code"], "PAID_30")
+
 
 def _call(
     method: str,

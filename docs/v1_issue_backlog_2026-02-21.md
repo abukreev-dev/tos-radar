@@ -35,6 +35,7 @@
 ### E1-03 Frontend: экран `Профиль -> Уведомления` (каркас)
 
 - Priority: P0
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: отрисовать секцию каналов, статусы, тумблеры, блок ошибок и кнопку `Сохранить`.
 - Depends on: E1-01
 - Acceptance:
@@ -45,6 +46,7 @@
 ### E1-04 Frontend: сохранение настроек + обработка ошибок
 
 - Priority: P0
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: подключить submit настроек, блокировку контролов на время сохранения, inline-ошибку + `Повторить`.
 - Depends on: E1-03
 - Acceptance:
@@ -100,6 +102,7 @@
 ### E2-04 Frontend: Telegram controls в `Уведомлениях`
 
 - Priority: P0
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: кнопки `Подключить/Отвязать`, `Отправить тест`, статус канала, обработка disconnected.
 - Depends on: E2-01, E2-02, E2-03, E1-03
 - Acceptance:
@@ -112,6 +115,7 @@
 ### E3-01 Frontend: унифицированный paywall inline-block
 
 - Priority: P0
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: внедрить единый UI-паттерн “нет доступа по тарифу” для каталога/настроек и других точек.
 - Depends on: нет
 - Acceptance:
@@ -131,6 +135,7 @@
 ### E3-03 QA: сценарии Free/Paid лимитов
 
 - Priority: P0
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: прогнать матрицу ограничений (подключения, уведомления, скрытые/доступные элементы).
 - Depends on: E3-01, E1-04, E2-04
 - Acceptance:

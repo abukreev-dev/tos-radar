@@ -15,6 +15,7 @@ from tos_radar.cabinet_account_lifecycle_service import (
     restore_account,
     start_soft_delete,
 )
+from tos_radar.cabinet_billing_service import get_billing_plan
 from tos_radar.cabinet_security_service import (
     create_session,
     get_active_sessions_count,
@@ -217,6 +218,14 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             user_id = _require_str(params, "user_id")
             access = get_access_state(tenant_id, user_id, now=datetime.now(UTC))
             return _json(start_response, HTTPStatus.OK, access.to_dict())
+
+        if method == "GET" and path == "/api/v1/billing/plan":
+            params = _parse_query(environ)
+            tenant_id = _require_str(params, "tenant_id")
+            user_id = _require_str(params, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
+            plan_code = get_billing_plan(tenant_id, user_id)
+            return _json(start_response, HTTPStatus.OK, {"plan_code": plan_code})
 
         return _json(start_response, HTTPStatus.NOT_FOUND, {"error": "NOT_FOUND"})
     except SettingsValidationError as exc:
