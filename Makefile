@@ -3,7 +3,7 @@ VENV ?= .venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
-.PHONY: install install-browser init run rerun-failed test lint report-open api-run
+.PHONY: install install-browser init run rerun-failed test lint report-open api-run acceptance-smoke
 
 install: $(VENV)/bin/python
 
@@ -35,3 +35,6 @@ report-open: install
 
 api-run: install
 	$(PY) -m tos_radar.cli api-run
+
+acceptance-smoke: install
+	$(PY) -m unittest tests.test_acceptance_smoke_backend -v
