@@ -24,6 +24,8 @@ class SourceType(str, Enum):
 
 class ErrorCode(str, Enum):
     BOT_DETECTED = "BOT_DETECTED"
+    TECHNICAL_PAGE = "TECHNICAL_PAGE"
+    SHORT_CONTENT = "SHORT_CONTENT"
     TIMEOUT = "TIMEOUT"
     NETWORK = "NETWORK"
     PROXY = "PROXY"
@@ -64,6 +66,7 @@ class AppSettings:
     retry_backoff_base_sec: float
     retry_backoff_max_sec: float
     retry_jitter_sec: float
+    min_text_length: int
     log_level: str
 
 

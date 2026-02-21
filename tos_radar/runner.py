@@ -11,7 +11,7 @@ from tos_radar.config import load_proxies, load_services
 from tos_radar.diff_utils import build_diff_html, is_changed
 from tos_radar.fetcher import fetch_with_retries
 from tos_radar.models import AppSettings
-from tos_radar.models import ErrorCode, RunEntry, Status
+from tos_radar.models import ErrorCode, RunEntry, SourceType, Status
 from tos_radar.normalize import normalize_for_storage
 from tos_radar.report import find_latest_report, write_report
 from tos_radar.state_store import read_current, write_current_and_rotate
@@ -115,6 +115,22 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     )
 
                 text = normalize_for_storage(result.text)
+                quality_issue = _quality_gate_error(text, result.source_type, settings.min_text_length)
+                if quality_issue is not None:
+                    code, message = quality_issue
+                    LOGGER.error("FAILED domain=%s error=%s", service.domain, message)
+                    return RunEntry(
+                        domain=service.domain,
+                        url=service.url,
+                        status=Status.FAILED,
+                        source_type=result.source_type,
+                        duration_sec=elapsed,
+                        text_length=len(text),
+                        error_code=code,
+                        error=message,
+                        diff_html=None,
+                    )
+
                 if mode == "init":
                     write_current_and_rotate(service.domain, text)
                     LOGGER.info("NEW domain=%s source=%s", service.domain, result.source_type.value)
@@ -214,3 +230,34 @@ async def _run(mode: str, settings: AppSettings) -> int:
 
 def sys_platform() -> str:
     return platform.system().lower()
+
+
+def _quality_gate_error(
+    text: str,
+    source_type: SourceType,
+    min_text_length: int,
+) -> tuple[ErrorCode, str] | None:
+    length = len(text)
+    if source_type == SourceType.HTML and length < min_text_length:
+        return (
+            ErrorCode.SHORT_CONTENT,
+            f"Document is too short ({length} chars), min required is {min_text_length}",
+        )
+
+    lowered = text.lower()
+    technical_markers = (
+        "if you are not a bot",
+        "forbidden",
+        "access denied",
+        "service unavailable",
+        "temporarily unavailable",
+        "technical maintenance",
+        "проверка безопасности",
+        "доступ запрещен",
+        "технические работы",
+        "сервис временно недоступен",
+    )
+    if any(marker in lowered for marker in technical_markers):
+        return (ErrorCode.TECHNICAL_PAGE, "Technical/blocked page detected")
+
+    return None

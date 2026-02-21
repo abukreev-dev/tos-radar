@@ -18,5 +18,6 @@ def load_settings() -> AppSettings:
         retry_backoff_base_sec=float(os.getenv("RETRY_BACKOFF_BASE_SEC", "0.8")),
         retry_backoff_max_sec=float(os.getenv("RETRY_BACKOFF_MAX_SEC", "8.0")),
         retry_jitter_sec=float(os.getenv("RETRY_JITTER_SEC", "0.4")),
+        min_text_length=int(os.getenv("MIN_TEXT_LENGTH", "350")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )
