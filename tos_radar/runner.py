@@ -6,18 +6,21 @@ import os
 import platform
 import subprocess
 import time
+from pathlib import Path
+from urllib.parse import urlparse
 
 from tos_radar.config import load_proxies, load_services
 from tos_radar.change_classifier import classify_change
 from tos_radar.diff_utils import build_diff_html, is_changed
 from tos_radar.fetcher import fetch_with_retries
 from tos_radar.models import AppSettings
-from tos_radar.models import ErrorCode, RunEntry, SourceType, Status
+from tos_radar.models import ErrorCode, RunEntry, Service, SourceType, Status
 from tos_radar.normalize import normalize_for_storage
 from tos_radar.report import find_latest_report, write_report
 from tos_radar.state_store import read_current, write_current_and_rotate
 
 LOGGER = logging.getLogger(__name__)
+LAST_FAILED_URLS_PATH = Path("data/last_failed_urls.txt")
 
 
 def run_init(settings: AppSettings) -> int:
@@ -26,6 +29,16 @@ def run_init(settings: AppSettings) -> int:
 
 def run_scan(settings: AppSettings) -> int:
     return asyncio.run(_run(mode="run", settings=settings))
+
+
+def run_rerun_failed(settings: AppSettings) -> int:
+    failed_urls = _read_last_failed_urls()
+    if not failed_urls:
+        LOGGER.info("No failed URLs from previous run.")
+        return 0
+    services = _services_from_urls(failed_urls)
+    LOGGER.info("Rerun-failed mode services=%s", len(services))
+    return asyncio.run(_run(mode="run", settings=settings, services_override=services))
 
 
 def open_last_report() -> int:
@@ -47,8 +60,8 @@ def open_last_report() -> int:
     return 0
 
 
-async def _run(mode: str, settings: AppSettings) -> int:
-    services = load_services(settings.tos_urls_file)
+async def _run(mode: str, settings: AppSettings, services_override: list[Service] | None = None) -> int:
+    services = services_override if services_override is not None else load_services(settings.tos_urls_file)
     proxies = load_proxies(settings.proxies_file)
     if not services:
         LOGGER.error("No URLs found in %s", settings.tos_urls_file)
@@ -246,7 +259,22 @@ async def _run(mode: str, settings: AppSettings) -> int:
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
 
+    if mode == "run":
+        domain_to_index = {service.domain: idx for idx, service in enumerate(services)}
+        failed_domains = sorted({entry.domain for entry in entries if entry.status == Status.FAILED})
+        if failed_domains:
+            LOGGER.info("Retrying failed domains once: %s", len(failed_domains))
+            retry_tasks = [asyncio.create_task(process(domain_to_index[domain])) for domain in failed_domains]
+            retry_entries: list[RunEntry] = []
+            for task in asyncio.as_completed(retry_tasks):
+                retry_entries.append(await task)
+            merged_entries = {entry.domain: entry for entry in entries}
+            for retried in retry_entries:
+                merged_entries[retried.domain] = retried
+            entries = list(merged_entries.values())
+
     entries.sort(key=lambda e: e.domain)
+    _write_last_failed_urls(entries)
     report_path = write_report(entries, mode)
     LOGGER.info("Report generated: %s", report_path)
     return 0
@@ -285,3 +313,35 @@ def _quality_gate_error(
         return (ErrorCode.TECHNICAL_PAGE, "Technical/blocked page detected")
 
     return None
+
+
+def _write_last_failed_urls(entries: list[RunEntry]) -> None:
+    failed_urls = sorted({entry.url for entry in entries if entry.status == Status.FAILED})
+    LAST_FAILED_URLS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LAST_FAILED_URLS_PATH.write_text("\n".join(failed_urls), encoding="utf-8")
+
+
+def _read_last_failed_urls() -> list[str]:
+    if not LAST_FAILED_URLS_PATH.exists():
+        return []
+    lines = []
+    for raw in LAST_FAILED_URLS_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line:
+            lines.append(line)
+    return lines
+
+
+def _services_from_urls(urls: list[str]) -> list[Service]:
+    services: list[Service] = []
+    seen: set[str] = set()
+    for url in urls:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        if not parsed.scheme or not domain:
+            continue
+        if domain in seen:
+            continue
+        seen.add(domain)
+        services.append(Service(domain=domain, url=url))
+    return services

@@ -3,7 +3,7 @@ VENV ?= .venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
-.PHONY: install install-browser init run test lint report-open
+.PHONY: install install-browser init run rerun-failed test lint report-open
 
 install: $(VENV)/bin/python
 
@@ -20,6 +20,9 @@ init: install-browser
 
 run: install-browser
 	$(PY) -m tos_radar.cli run
+
+rerun-failed: install-browser
+	$(PY) -m tos_radar.cli rerun-failed
 
 test: install
 	$(PY) -m unittest discover -s tests -p "test_*.py" -v

@@ -4,13 +4,13 @@ import argparse
 import sys
 
 from tos_radar.logging_utils import setup_logging
-from tos_radar.runner import open_last_report, run_init, run_scan
+from tos_radar.runner import open_last_report, run_init, run_rerun_failed, run_scan
 from tos_radar.settings import load_settings
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="tos-radar")
-    parser.add_argument("command", choices=["init", "run", "report-open"])
+    parser.add_argument("command", choices=["init", "run", "rerun-failed", "report-open"])
     args = parser.parse_args()
 
     settings = load_settings()
@@ -20,6 +20,8 @@ def main() -> int:
         return run_init(settings)
     if args.command == "run":
         return run_scan(settings)
+    if args.command == "rerun-failed":
+        return run_rerun_failed(settings)
     return open_last_report()
 
 
