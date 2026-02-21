@@ -1,37 +1,37 @@
 # tos-radar
 
-Ежедневный мониторинг изменений ToS-документов (HTML/PDF) с сохранением baseline, сравнением текста и генерацией общего HTML-отчета.
+Ежедневный мониторинг изменений ToS-документов (HTML/PDF): сбор текста, сравнение с baseline, классификация изменений и HTML-отчет.
 
-## Что уже реализовано
+## Текущее состояние
 
-- `Python 3.12 + Playwright`.
-- Режимы `init` и `run`.
-- Источник URL из файла (`1 домен = 1 URL`, дубликаты домена блокируются).
-- Поддержка PDF по прямой ссылке.
-- Ретраи: сначала без прокси, потом до `N` прокси из списка.
-- Нормализация текста для сравнения: lowercase, схлопывание пробелов, удаление пунктуации.
-- Статусы: `NEW`, `CHANGED`, `UNCHANGED`, `FAILED`.
-- Хранение двух последних версий на диск: `current.txt` и `previous.txt`.
-- Единый HTML-отчет за запуск с подсвеченным diff для `CHANGED`.
-- Логирование в консоль и в файл.
+- Стек: `Python 3.12 + Playwright + pypdf`.
+- Режимы: `init`, `run`, `rerun-failed`, `report-open`.
+- Входные URL: `config/tos_urls.txt` (дубли домена автоматически пропускаются, берется первый URL домена).
+- Поддержка HTML и прямых PDF URL.
+- Ретраи: первая попытка без прокси, затем до `RETRY_PROXY_COUNT` прокси.
+- Exponential backoff + jitter между попытками.
+- Жесткие таймауты:
+  - на попытку fetch;
+  - на сервис целиком.
+- Авто-повтор упавших доменов один раз в конце `run`.
+- Отдельный запуск только для прошлых падений: `rerun-failed`.
+- Quality gates:
+  - `SHORT_CONTENT` для слишком коротких HTML-документов;
+  - `TECHNICAL_PAGE` для тех/блок-страниц.
+- Anti-bot/блокировки классифицируются отдельными `error_code`.
+- Классификация изменений: `NOISE`, `MINOR`, `MAJOR` + `change_ratio`.
+- В отчете есть блок `Suspicious CHANGED`.
 
-## Архитектура
+## Multi-tenant хранение
 
-- `tos_radar/cli.py`: входная точка (`init`, `run`, `report-open`).
-- `tos_radar/runner.py`: оркестрация параллельной обработки.
-- `tos_radar/fetcher.py`: получение HTML/PDF, таймауты, прокси-ретраи.
-- `tos_radar/normalize.py`: нормализация текста.
-- `tos_radar/diff_utils.py`: сравнение и HTML diff.
-- `tos_radar/state_store.py`: файловое состояние (`current/previous`).
-- `tos_radar/report.py`: общий HTML-отчет.
-- `tos_radar/config.py`: загрузка URL и прокси из файлов.
-- `tos_radar/settings.py`: загрузка параметров из `.env`.
+Все артефакты разделены по `TENANT_ID`:
 
-## Требования
+- state: `data/state/<tenant_id>/<domain>/current.txt` и `previous.txt`
+- failed list: `data/<tenant_id>/last_failed_urls.txt`
+- logs: `logs/<tenant_id>/run-YYYYMMDD-HHMMSS.log`
+- reports: `reports/<tenant_id>/report-YYYYMMDD-HHMMSS.html`
 
-- `Python 3.12+`.
-- `chromium` для Playwright (устанавливается через `make init` или `make run`).
-- Linux/macOS (для `make report-open` на Linux нужен `xdg-open`, на macOS используется `open`).
+По умолчанию `TENANT_ID=default`.
 
 ## Быстрый старт
 
@@ -41,28 +41,35 @@ cp .env.example .env
 cp config/tos_urls.txt.example config/tos_urls.txt
 cp config/proxies.txt.example config/proxies.txt
 ```
-2. Заполнить `config/tos_urls.txt` реальными URL ToS.
-3. При необходимости заполнить `config/proxies.txt`.
-4. Инициализировать baseline:
+
+2. Заполнить `config/tos_urls.txt` реальными URL.
+
+3. Первый baseline:
 ```bash
 make init
 ```
-5. Выполнить проверку изменений:
+
+4. Обычный запуск:
 ```bash
 make run
 ```
-6. Открыть последний отчет:
+
+5. Повторить только прошлые падения:
+```bash
+make rerun-failed
+```
+
+6. Открыть последний отчет текущего tenant:
 ```bash
 make report-open
 ```
 
-## Формат входных файлов
+## Форматы входных файлов
 
 `config/tos_urls.txt`:
-
-- Один URL на строку.
-- В MVP допускается только один URL на домен.
-- Пустые строки и строки, начинающиеся с `#`, игнорируются.
+- один URL на строку;
+- пустые строки и комментарии (`#`) игнорируются;
+- при дубле домена берется первый URL, остальные пропускаются в лог.
 
 Пример:
 ```text
@@ -71,10 +78,8 @@ https://example.org/tos.pdf
 ```
 
 `config/proxies.txt`:
-
-- Один прокси на строку.
-- Поддерживаемый формат: `host:port`.
-- Поддерживаемый формат: `host:port:login:pass`.
+- `host:port`
+- `host:port:login:pass`
 
 Пример:
 ```text
@@ -82,8 +87,9 @@ https://example.org/tos.pdf
 127.0.0.1:8081:user:password
 ```
 
-## Конфигурация через `.env`
+## Конфигурация `.env`
 
+- `TENANT_ID` (по умолчанию `default`)
 - `TOS_URLS_FILE` (по умолчанию `config/tos_urls.txt`)
 - `PROXIES_FILE` (по умолчанию `config/proxies.txt`)
 - `CONCURRENCY` (по умолчанию `20`)
@@ -92,108 +98,70 @@ https://example.org/tos.pdf
 - `RETRY_BACKOFF_BASE_SEC` (по умолчанию `0.8`)
 - `RETRY_BACKOFF_MAX_SEC` (по умолчанию `8.0`)
 - `RETRY_JITTER_SEC` (по умолчанию `0.4`)
+- `MIN_TEXT_LENGTH` (по умолчанию `350`, только для HTML)
 - `LOG_LEVEL` (по умолчанию `INFO`)
 
-## Поведение `init` и `run`
+## Поведение режимов
 
 `make init`:
-
-- Загружает документы и сохраняет baseline.
-- Помечает элементы как `NEW`.
-- Формирует общий отчет в `reports/`.
+- загружает документы и записывает baseline;
+- статусы в отчете обычно `NEW`/`FAILED`.
 
 `make run`:
+- сравнивает с baseline;
+- пишет `CHANGED/UNCHANGED/FAILED`;
+- при `CHANGED` обновляет baseline;
+- в конце один раз автоматически повторяет только `FAILED` домены.
 
-- Сравнивает свежую версию с `current.txt`.
-- Если есть изменение, статус `CHANGED`, создается diff, baseline обновляется.
-- Если изменений нет, статус `UNCHANGED`.
-- Если документ получить не удалось, статус `FAILED`, baseline не меняется.
-- Для `FAILED` в отчете фиксируются `error_code` и текст ошибки.
-- Если baseline отсутствует для домена, запись получает `NEW`.
+`make rerun-failed`:
+- берет URL из `data/<tenant_id>/last_failed_urls.txt`;
+- прогоняет только их.
 
-## Ретраи и прокси
+## `error_code`
 
-- Попытка 1: без прокси.
-- Дальше: до `RETRY_PROXY_COUNT` прокси из `config/proxies.txt`.
-- На каждую попытку действует `TIMEOUT_SEC`.
-- Между попытками используется exponential backoff с jitter.
-- При успешной последней попытке именно она считается финальным результатом URL.
+- `BOT_DETECTED`
+- `TECHNICAL_PAGE`
+- `SHORT_CONTENT`
+- `TIMEOUT`
+- `NETWORK`
+- `PROXY`
+- `BROWSER`
+- `PDF_DOWNLOAD`
+- `PDF_PARSE`
+- `EMPTY_CONTENT`
+- `PARSER`
+- `UNKNOWN`
 
-## Что считается изменением
+## Изменения и diff
 
-- Сравнение делается по нормализованному тексту.
-- Игнорируются различия в регистре, пунктуации и пробелах.
-- Изменения дат вида `Last updated` считаются реальным изменением (если поменялся текст даты).
-
-## Данные и артефакты
-
-- Состояние `current`: `data/state/<domain>/current.txt`.
-- Состояние `previous`: `data/state/<domain>/previous.txt`.
-- Логи запуска: `logs/run-YYYYMMDD-HHMMSS.log`.
-- HTML-отчеты: `reports/report-YYYYMMDD-HHMMSS.html`.
+- Сравнение идет по нормализованному тексту.
+- Для `CHANGED` считаются:
+  - `change_level`: `NOISE/MINOR/MAJOR`
+  - `change_ratio`: доля отличий.
+- В отчете есть:
+  - `text_length`;
+  - `change_level`, `change_ratio`;
+  - отдельный блок `Suspicious CHANGED`.
 
 ## Make-команды
 
-- `make install`: создать venv и поставить зависимости Python.
-- `make install-browser`: установить Chromium для Playwright.
-- `make init`: первичный сбор baseline.
-- `make run`: регулярный запуск сравнения.
-- `make test`: unit-тесты.
-- `make lint`: `ruff`.
-- `make report-open`: открыть последний отчет.
-
-## Cron (ежедневный запуск)
-
-Пример запуска каждый день в `03:30`:
-
-```cron
-30 3 * * * cd /path/to/tos-radar && make run >> /path/to/tos-radar/logs/cron.log 2>&1
-```
-
-Если используется отдельный пользователь/окружение, проверьте путь к `python3.12` и доступность `playwright`-браузера в этом окружении.
+- `make install`
+- `make install-browser`
+- `make init`
+- `make run`
+- `make rerun-failed`
+- `make test`
+- `make lint`
+- `make report-open`
 
 ## Тесты
 
-- `tests/test_config.py`: парсинг URL/прокси и валидация доменов.
-- `tests/test_normalize.py`: нормализация текста.
-- `tests/test_diff_utils.py`: сравнение и генерация diff.
-- `tests/test_fetcher.py`: порядок попыток без/с прокси.
-- `tests/test_state_store.py`: ротация `current -> previous`.
-
-Запуск:
 ```bash
 make test
 make lint
 ```
 
-## Ограничения MVP
+## Контекст
 
-- Нет UI и аккаунтов пользователей.
-- Нет автопоиска ToS по сайту.
-- Нет перехода по ссылкам со страницы на документ.
-- Нет уведомлений в Telegram/email/webhook.
-- Нет БД и длинной истории версий.
-- Эвристическая очистка HTML без site-specific правил.
-
-## Roadmap
-
-### MVP
-
-- Ежедневный запуск по cron.
-- Мониторинг фиксированного списка URL.
-- HTML/PDF обработка и diff-отчет.
-- Ретраи с прокси после попытки без прокси.
-- Файловое хранение двух последних версий.
-
-### Полный релиз
-
-- UI с аккаунтами и настройками источников.
-- Пользовательские списки сервисов.
-- Автопоиск актуальной ToS/договора на сайте.
-- Многоканальные уведомления.
-- БД и аналитика истории изменений.
-- Гибкие правила очистки для конкретных доменов.
-
-## Контекст решений
-
-Подробно зафиксированный контекст обсуждения: `docs/context.md`.
+- Краткий актуальный контекст: `docs/context.md`
+- Полный контекст и история решений: `docs/project_context_full.md`
