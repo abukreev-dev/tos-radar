@@ -25,6 +25,7 @@
 - Playwright (Chromium)
 - pypdf
 - unittest + ruff
+- Frontend v1: отдельный репозиторий `../tos-radar-frontend` (vanilla HTML/CSS/JS + node:test)
 
 ## 4) Команды
 
@@ -160,6 +161,8 @@ CLI:
 - runner quality gates
 - failed url persistence
 - state_store
+- cabinet_billing_service
+- cabinet_api degradation flows (`4xx/5xx/network/timeout`)
 
 ## 16) Ключевые последние коммиты
 
@@ -181,3 +184,14 @@ CLI:
 - уведомления (Telegram/email/webhook)
 - БД и историческая аналитика
 - site-specific extraction rules
+
+## 19) Актуальный статус реализации v1 P0 (2026-02-21)
+
+- Backend P0: закрыты (`E7-03`, `E8-01`, `E8-02`), подтверждены тестами.
+- Frontend P0: закрыты в `../tos-radar-frontend` (`E1-03`, `E1-04`, `E2-04`, `E3-01`, `E3-03`).
+- Backlog синхронизирован со статусами `DONE` по указанным задачам.
+
+## 20) Актуальные API кабинета (добавление)
+
+- Добавлен endpoint `GET /api/v1/billing/plan`.
+- Назначение: отдать `plan_code` (`FREE|PAID_30|PAID_100`) для применения UI ограничений и paywall-сценариев.

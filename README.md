@@ -219,3 +219,4 @@ make acceptance-smoke
 
 - Краткий актуальный контекст: `docs/context.md`
 - Полный контекст и история решений: `docs/project_context_full.md`
+- Frontend-реализация кабинета: `../tos-radar-frontend`

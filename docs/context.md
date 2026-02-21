@@ -23,6 +23,19 @@
 - На защищенных endpoint'ах включена проверка `X-Session-Id`.
 - В режиме `RECOVERY_ONLY` разрешены только `access-state` и `restore`.
 - Backend acceptance smoke автоматизирован (`make acceptance-smoke`).
+- Добавлен endpoint тарифа: `GET /api/v1/billing/plan`.
+- Добавлен backend acceptance-набор: `make acceptance-backend`.
+
+## Frontend v1 (статус на 2026-02-21)
+
+- Реализация вынесена в отдельный репозиторий: `../tos-radar-frontend`.
+- Закрыты `P0` задачи frontend первой волны:
+  - `E1-03` экран `Профиль -> Уведомления` (каркас, desktop/mobile, API load).
+  - `E1-04` сохранение настроек (`Сохранить`, lock during submit, inline retry, `Сохранено`).
+  - `E2-04` Telegram controls (`link/unlink/test`, disconnected + `Переподключить`).
+  - `E3-01` единый inline paywall-компонент, применен в настройках/Telegram/каталоге.
+  - `E3-03` QA матрица Free/Paid оформлена и автоматизирована.
+- Источник тарифа для UI: backend `GET /api/v1/billing/plan` (query `restrict=` оставлен как QA override).
 
 ## Цель
 
