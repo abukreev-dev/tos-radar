@@ -202,6 +202,7 @@ https://example.org/tos.pdf
 - `make api-run`
 - `make db-migrate`
 - `make acceptance-smoke`
+- `make acceptance-backend`
 
 ## Тесты
 

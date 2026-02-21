@@ -3,7 +3,7 @@ VENV ?= .venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
-.PHONY: install install-browser init run rerun-failed test lint report-open api-run db-migrate acceptance-smoke
+.PHONY: install install-browser init run rerun-failed test lint report-open api-run db-migrate acceptance-smoke acceptance-backend
 
 install: $(VENV)/bin/python
 
@@ -41,3 +41,16 @@ db-migrate: install
 
 acceptance-smoke: install
 	$(PY) -m unittest tests.test_acceptance_smoke_backend -v
+
+acceptance-backend: install
+	$(PY) -m unittest \
+		tests.test_cabinet_service \
+		tests.test_cabinet_telegram_service \
+		tests.test_cabinet_telegram_test_service \
+		tests.test_cabinet_security_service \
+		tests.test_cabinet_account_lifecycle_service \
+		tests.test_cabinet_store \
+		tests.test_cabinet_api \
+		tests.test_cabinet_api_degradation \
+		tests.test_acceptance_smoke_backend \
+		-v

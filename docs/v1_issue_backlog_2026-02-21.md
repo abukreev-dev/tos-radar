@@ -263,7 +263,7 @@
 ### E8-01 QA: full acceptance pass на staging
 
 - Priority: P0
-- Status: IN PROGRESS (backend smoke automated and green, 2026-02-21)
+- Status: DONE (backend scope pass automated via `make acceptance-backend`, 2026-02-21)
 - Что сделать: полный прогон чеклиста из `docs/v1_scope_checklist_2026-02-21.md`.
 - Depends on: E1..E7
 - Acceptance:
