@@ -256,6 +256,7 @@
 ### E7-02 Frontend: унифицированный `500` + short error id
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: экран системной ошибки с коротким ID для поддержки.
 - Depends on: нет
 - Acceptance:
