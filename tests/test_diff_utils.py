@@ -15,3 +15,9 @@ class DiffTests(unittest.TestCase):
     def test_build_diff_html_has_table(self) -> None:
         html = build_diff_html("old", "new")
         self.assertIn("<table class=\"diff\"", html)
+
+    def test_build_diff_html_handles_very_long_lines(self) -> None:
+        long_old = "a" * 20000
+        long_new = "a" * 19999 + "b"
+        html = build_diff_html(long_old, long_new)
+        self.assertIn("<table class=\"diff\"", html)

@@ -13,4 +13,9 @@ def normalize_for_compare(text: str) -> str:
 
 
 def normalize_for_storage(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
+    lines = []
+    for raw in text.splitlines():
+        line = re.sub(r"[ \t]+", " ", raw).strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines)

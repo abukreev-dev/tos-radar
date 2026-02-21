@@ -13,4 +13,4 @@ class NormalizeTests(unittest.TestCase):
 
     def test_storage_normalization_collapse_spaces(self) -> None:
         value = "Hello \n\n world\t  again"
-        self.assertEqual(normalize_for_storage(value), "Hello world again")
+        self.assertEqual(normalize_for_storage(value), "Hello\nworld again")
