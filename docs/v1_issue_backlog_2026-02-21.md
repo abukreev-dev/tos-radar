@@ -159,6 +159,7 @@
 ### E4-02 Frontend: onboarding-чеклист на Dashboard
 
 - Priority: P2
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: компактный скрываемый чеклист.
 - Depends on: E4-01
 - Acceptance:
