@@ -17,6 +17,11 @@ class Service:
     url: str
 
 
+class SourceType(str, Enum):
+    HTML = "HTML"
+    PDF = "PDF"
+
+
 @dataclass(frozen=True)
 class Proxy:
     host: str
@@ -44,3 +49,24 @@ class AppSettings:
     timeout_sec: int
     retry_proxy_count: int
     log_level: str
+
+
+@dataclass(frozen=True)
+class FetchResult:
+    ok: bool
+    text: str
+    source_type: SourceType
+    attempt: int
+    proxy_used: str | None = None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class RunEntry:
+    domain: str
+    url: str
+    status: Status
+    source_type: SourceType | None
+    duration_sec: float
+    error: str | None
+    diff_html: str | None
