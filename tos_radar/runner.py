@@ -73,6 +73,9 @@ async def _run(mode: str, settings: AppSettings) -> int:
                 service=service,
                 timeout_sec=settings.timeout_sec,
                 retry_proxy_count=settings.retry_proxy_count,
+                retry_backoff_base_sec=settings.retry_backoff_base_sec,
+                retry_backoff_max_sec=settings.retry_backoff_max_sec,
+                retry_jitter_sec=settings.retry_jitter_sec,
                 proxies=proxies,
             )
             elapsed = time.perf_counter() - started
@@ -84,6 +87,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.FAILED,
                     source_type=None,
                     duration_sec=elapsed,
+                    error_code=result.error_code,
                     error=result.error,
                     diff_html=None,
                 )
@@ -98,6 +102,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.NEW,
                     source_type=result.source_type,
                     duration_sec=elapsed,
+                    error_code=None,
                     error=None,
                     diff_html=None,
                 )
@@ -112,6 +117,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.NEW,
                     source_type=result.source_type,
                     duration_sec=elapsed,
+                    error_code=None,
                     error=None,
                     diff_html=None,
                 )
@@ -126,6 +132,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.CHANGED,
                     source_type=result.source_type,
                     duration_sec=elapsed,
+                    error_code=None,
                     error=None,
                     diff_html=diff_html,
                 )
@@ -137,6 +144,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                 status=Status.UNCHANGED,
                 source_type=result.source_type,
                 duration_sec=elapsed,
+                error_code=None,
                 error=None,
                 diff_html=None,
             )

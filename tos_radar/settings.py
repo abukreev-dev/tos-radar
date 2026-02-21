@@ -15,5 +15,8 @@ def load_settings() -> AppSettings:
         concurrency=int(os.getenv("CONCURRENCY", "20")),
         timeout_sec=int(os.getenv("TIMEOUT_SEC", "60")),
         retry_proxy_count=int(os.getenv("RETRY_PROXY_COUNT", "3")),
+        retry_backoff_base_sec=float(os.getenv("RETRY_BACKOFF_BASE_SEC", "0.8")),
+        retry_backoff_max_sec=float(os.getenv("RETRY_BACKOFF_MAX_SEC", "8.0")),
+        retry_jitter_sec=float(os.getenv("RETRY_JITTER_SEC", "0.4")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
     )

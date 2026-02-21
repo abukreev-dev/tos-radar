@@ -29,6 +29,7 @@ def _render(entries: list[RunEntry], mode: str) -> str:
     for entry in entries:
         diff_block = entry.diff_html or ""
         error = escape(entry.error or "")
+        error_code = entry.error_code.value if entry.error_code else "-"
         source = entry.source_type.value if entry.source_type else "-"
         rows.append(
             f"""
@@ -39,6 +40,7 @@ def _render(entries: list[RunEntry], mode: str) -> str:
                 <div><b>status</b>: {entry.status.value}</div>
                 <div><b>source</b>: {source}</div>
                 <div><b>duration</b>: {entry.duration_sec:.2f}s</div>
+                <div><b>error_code</b>: {error_code}</div>
                 <div><b>error</b>: {error or "-"}</div>
               </div>
               <div class="diff">{diff_block}</div>

@@ -2,32 +2,49 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import random
+import re
 from io import BytesIO
 from typing import Sequence
 from urllib.error import URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
-from tos_radar.models import FetchResult, Proxy, Service, SourceType
+from tos_radar.models import ErrorCode, FetchResult, Proxy, Service, SourceType
 
 LOGGER = logging.getLogger(__name__)
+
+
+class FetchError(RuntimeError):
+    def __init__(self, code: ErrorCode, message: str):
+        super().__init__(message)
+        self.code = code
 
 
 async def fetch_with_retries(
     service: Service,
     timeout_sec: int,
     retry_proxy_count: int,
+    retry_backoff_base_sec: float,
+    retry_backoff_max_sec: float,
+    retry_jitter_sec: float,
     proxies: Sequence[Proxy],
 ) -> FetchResult:
     attempts = build_attempts(proxies, retry_proxy_count)
+    total_attempts = len(attempts)
     last_error = "unknown error"
+    last_error_code = ErrorCode.UNKNOWN
 
     for idx, proxy in enumerate(attempts, start=1):
         try:
             if service.url.lower().endswith(".pdf"):
                 text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
+                cleaned_text = _clean_extracted_text(text)
+                if not cleaned_text:
+                    raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
                 return FetchResult(
                     ok=True,
-                    text=text,
+                    text=cleaned_text,
                     source_type=SourceType.PDF,
                     attempt=idx,
                     proxy_used=proxy.to_proxy_url() if proxy else None,
@@ -36,30 +53,62 @@ async def fetch_with_retries(
             html_text, maybe_pdf = await _fetch_html_text(service.url, timeout_sec, proxy)
             if maybe_pdf:
                 text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
+                cleaned_text = _clean_extracted_text(text)
+                if not cleaned_text:
+                    raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
                 return FetchResult(
                     ok=True,
-                    text=text,
+                    text=cleaned_text,
                     source_type=SourceType.PDF,
                     attempt=idx,
                     proxy_used=proxy.to_proxy_url() if proxy else None,
                 )
 
+            cleaned_text = _clean_extracted_text(html_text)
+            if not cleaned_text:
+                raise FetchError(ErrorCode.EMPTY_CONTENT, "Page contains no extractable text")
+
             return FetchResult(
                 ok=True,
-                text=html_text,
+                text=cleaned_text,
                 source_type=SourceType.HTML,
                 attempt=idx,
                 proxy_used=proxy.to_proxy_url() if proxy else None,
             )
-        except Exception as exc:  # noqa: BLE001
+        except FetchError as exc:
             last_error = str(exc)
+            last_error_code = exc.code
             LOGGER.warning(
-                "Fetch failed domain=%s attempt=%s proxy=%s error=%s",
+                "Fetch failed domain=%s attempt=%s/%s proxy=%s code=%s error=%s",
                 service.domain,
                 idx,
+                total_attempts,
                 proxy.to_proxy_url() if proxy else "none",
+                exc.code.value,
                 exc,
             )
+        except Exception as exc:  # noqa: BLE001
+            code = classify_untyped_error(exc)
+            last_error = str(exc)
+            last_error_code = code
+            LOGGER.warning(
+                "Fetch failed domain=%s attempt=%s/%s proxy=%s code=%s error=%s",
+                service.domain,
+                idx,
+                total_attempts,
+                proxy.to_proxy_url() if proxy else "none",
+                code.value,
+                exc,
+            )
+
+        if idx < total_attempts:
+            delay = compute_retry_delay(
+                attempt_index=idx,
+                base_sec=retry_backoff_base_sec,
+                max_sec=retry_backoff_max_sec,
+                jitter_sec=retry_jitter_sec,
+            )
+            await asyncio.sleep(delay)
 
     return FetchResult(
         ok=False,
@@ -67,6 +116,7 @@ async def fetch_with_retries(
         source_type=SourceType.HTML,
         attempt=len(attempts),
         proxy_used=None,
+        error_code=last_error_code,
         error=last_error,
     )
 
@@ -77,50 +127,114 @@ def build_attempts(proxies: Sequence[Proxy], retry_proxy_count: int) -> list[Pro
     return attempts
 
 
+def compute_retry_delay(
+    attempt_index: int,
+    base_sec: float = 0.8,
+    max_sec: float = 8.0,
+    jitter_sec: float = 0.4,
+) -> float:
+    exp_delay = base_sec * math.pow(2.0, max(0, attempt_index - 1))
+    capped = min(max_sec, exp_delay)
+    jitter = random.uniform(0.0, max(0.0, jitter_sec))
+    return capped + jitter
+
+
+def classify_untyped_error(exc: Exception) -> ErrorCode:
+    message = str(exc).lower()
+    if "timeout" in message:
+        return ErrorCode.TIMEOUT
+    if "proxy" in message or "407" in message:
+        return ErrorCode.PROXY
+    if "net::" in message or "connection" in message or "dns" in message:
+        return ErrorCode.NETWORK
+    if "browser" in message or "chromium" in message:
+        return ErrorCode.BROWSER
+    return ErrorCode.UNKNOWN
+
+
 async def _fetch_html_text(url: str, timeout_sec: int, proxy: Proxy | None) -> tuple[str, bool]:
     try:
         from playwright.async_api import TimeoutError as PlaywrightTimeoutError
         from playwright.async_api import async_playwright
     except Exception as exc:  # noqa: BLE001
         msg = "Playwright is not installed. Run: python -m playwright install chromium"
-        raise RuntimeError(msg) from exc
+        raise FetchError(ErrorCode.BROWSER, msg) from exc
 
     launch_kwargs: dict[str, object] = {"headless": True}
     if proxy is not None:
         launch_kwargs["proxy"] = proxy.to_playwright_proxy()
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(**launch_kwargs)
-        try:
-            page = await browser.new_page()
-            response = await page.goto(url, timeout=timeout_sec * 1000, wait_until="domcontentloaded")
-            if response is None:
-                raise RuntimeError("No response from target page")
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(**launch_kwargs)
+            try:
+                page = await browser.new_page()
+                response = await page.goto(url, timeout=timeout_sec * 1000, wait_until="domcontentloaded")
+                if response is None:
+                    raise FetchError(ErrorCode.NETWORK, "No response from target page")
 
-            content_type = response.headers.get("content-type", "").lower()
-            if "application/pdf" in content_type:
-                return "", True
+                content_type = response.headers.get("content-type", "").lower()
+                if "application/pdf" in content_type:
+                    return "", True
 
-            await page.wait_for_timeout(1200)
-            text = await page.evaluate(
-                """() => {
-                  const body = document.body;
-                  if (!body) return '';
-                  const clone = body.cloneNode(true);
-                  clone.querySelectorAll(
-                    'script,style,noscript,svg,nav,footer,header,aside,form,' +
-                    'button,input,select,textarea,a'
-                  ).forEach((node) => node.remove());
-                  return clone.innerText || '';
-                }"""
-            )
-            if not text or not text.strip():
-                text = await page.evaluate("() => document.body ? document.body.innerText : ''")
-            return text, False
-        except PlaywrightTimeoutError as exc:
-            raise TimeoutError(f"Page timeout after {timeout_sec}s") from exc
-        finally:
-            await browser.close()
+                await page.wait_for_timeout(1200)
+                text = await page.evaluate(
+                    """() => {
+                      const selectorsToDrop = [
+                        'script', 'style', 'noscript', 'svg', 'nav', 'footer', 'header', 'aside',
+                        'form', 'button', 'input', 'select', 'textarea', 'a', 'iframe',
+                        '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]',
+                        '.cookie', '#cookie', '.cookies', '.consent', '.banner', '.modal', '.popup',
+                        '.newsletter', '.subscribe', '.social', '.breadcrumbs', '.breadcrumb'
+                      ];
+                      const body = document.body;
+                      if (!body) return '';
+                      const clone = body.cloneNode(true);
+                      clone.querySelectorAll(selectorsToDrop.join(',')).forEach((node) => node.remove());
+
+                      const candidates = Array.from(
+                        clone.querySelectorAll(
+                          'main, article, [role="main"], .content, .main-content, .terms, .tos, .legal'
+                        )
+                      );
+                      const blocks = candidates.length > 0 ? candidates : [clone];
+
+                      let bestText = '';
+                      for (const block of blocks) {
+                        const lines = (block.innerText || '')
+                          .split('\\n')
+                          .map((x) => x.trim())
+                          .filter(Boolean);
+                        const scored = lines.filter((line) => {
+                          if (line.length < 25) return false;
+                          const words = line.split(/\\s+/).filter(Boolean);
+                          const urlTokens = words.filter((w) => /https?:\\/\\//i.test(w)).length;
+                          const navLike = /(home|about|contact|pricing|blog|careers|help|support)/i.test(line);
+                          return !(urlTokens > 0 && words.length <= 8) && !navLike;
+                        });
+                        const candidateText = scored.join('\\n');
+                        if (candidateText.length > bestText.length) {
+                          bestText = candidateText;
+                        }
+                      }
+                      return bestText;
+                    }"""
+                )
+                if not text or not text.strip():
+                    text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                return text, False
+            except PlaywrightTimeoutError as exc:
+                raise FetchError(ErrorCode.TIMEOUT, f"Page timeout after {timeout_sec}s") from exc
+            except FetchError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                raise FetchError(classify_untyped_error(exc), str(exc)) from exc
+            finally:
+                await browser.close()
+    except FetchError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise FetchError(classify_untyped_error(exc), str(exc)) from exc
 
 
 async def _fetch_pdf_text(url: str, timeout_sec: int, proxy: Proxy | None) -> str:
@@ -143,14 +257,48 @@ def _download_pdf(url: str, timeout_sec: int, proxy: Proxy | None) -> bytes:
         with opener.open(req, timeout=timeout_sec) as response:  # type: ignore[arg-type]
             return response.read()
     except URLError as exc:
-        raise RuntimeError(f"PDF download failed: {exc}") from exc
+        code = ErrorCode.PROXY if "407" in str(exc) or "proxy" in str(exc).lower() else ErrorCode.PDF_DOWNLOAD
+        raise FetchError(code, f"PDF download failed: {exc}") from exc
 
 
 def _extract_text_from_pdf(data: bytes) -> str:
     from pypdf import PdfReader
 
-    reader = PdfReader(BytesIO(data))
-    chunks: list[str] = []
-    for page in reader.pages:
-        chunks.append(page.extract_text() or "")
-    return "\n".join(chunks)
+    try:
+        reader = PdfReader(BytesIO(data))
+        chunks: list[str] = []
+        for page in reader.pages:
+            chunks.append(page.extract_text() or "")
+        return "\n".join(chunks)
+    except Exception as exc:  # noqa: BLE001
+        raise FetchError(ErrorCode.PDF_PARSE, f"PDF parsing failed: {exc}") from exc
+
+
+def _clean_extracted_text(text: str) -> str:
+    lines = text.splitlines()
+    out: list[str] = []
+    noise_tokens = (
+        "cookie",
+        "privacy center",
+        "all rights reserved",
+        "follow us",
+        "subscribe",
+        "newsletter",
+        "accept all",
+        "reject all",
+    )
+    for raw in lines:
+        line = re.sub(r"\s+", " ", raw).strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if any(token in lower for token in noise_tokens) and len(line) < 160:
+            continue
+        words = line.split()
+        url_like = sum(1 for w in words if "http://" in w.lower() or "https://" in w.lower())
+        if url_like > 0 and len(words) <= 8:
+            continue
+        if len(line) < 3:
+            continue
+        out.append(line)
+    return "\n".join(out).strip()

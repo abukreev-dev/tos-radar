@@ -22,6 +22,18 @@ class SourceType(str, Enum):
     PDF = "PDF"
 
 
+class ErrorCode(str, Enum):
+    TIMEOUT = "TIMEOUT"
+    NETWORK = "NETWORK"
+    PROXY = "PROXY"
+    BROWSER = "BROWSER"
+    PDF_DOWNLOAD = "PDF_DOWNLOAD"
+    PDF_PARSE = "PDF_PARSE"
+    EMPTY_CONTENT = "EMPTY_CONTENT"
+    PARSER = "PARSER"
+    UNKNOWN = "UNKNOWN"
+
+
 @dataclass(frozen=True)
 class Proxy:
     host: str
@@ -48,6 +60,9 @@ class AppSettings:
     concurrency: int
     timeout_sec: int
     retry_proxy_count: int
+    retry_backoff_base_sec: float
+    retry_backoff_max_sec: float
+    retry_jitter_sec: float
     log_level: str
 
 
@@ -58,6 +73,7 @@ class FetchResult:
     source_type: SourceType
     attempt: int
     proxy_used: str | None = None
+    error_code: ErrorCode | None = None
     error: str | None = None
 
 
@@ -68,5 +84,6 @@ class RunEntry:
     status: Status
     source_type: SourceType | None
     duration_sec: float
+    error_code: ErrorCode | None
     error: str | None
     diff_html: str | None
