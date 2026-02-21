@@ -13,6 +13,7 @@
 ### E1-01 Backend: модель настроек уведомлений
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: реализовать хранение и чтение настроек каналов (email digest, telegram digest, маркетинг, системные), статусы канала и метаданные ошибок.
 - Depends on: нет
 - Acceptance:
@@ -23,6 +24,7 @@
 ### E1-02 Backend: ограничения verify email
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: запретить включение email-дайджеста без подтвержденного email; добавить reason code для UI.
 - Depends on: E1-01
 - Acceptance:
@@ -65,6 +67,7 @@
 ### E2-01 Backend: link/unlink Telegram
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: реализовать API привязки/отвязки Telegram через одноразовый код и хранение статуса связки.
 - Depends on: E1-01
 - Acceptance:
@@ -75,6 +78,7 @@
 ### E2-02 Backend: test-send Telegram + rate-limit
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: endpoint тестовой отправки Telegram (`1/60 сек`, `20/сутки`).
 - Depends on: E2-01
 - Acceptance:
