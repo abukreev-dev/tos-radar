@@ -37,6 +37,7 @@ Health-check:
 Базовые endpoint'ы кабинета:
 - `GET /api/v1/notification-settings`
 - `POST /api/v1/notification-settings`
+- `POST /api/v1/email/verify/resend`
 - `POST /api/v1/telegram/link/start`
 - `POST /api/v1/telegram/link/confirm`
 - `POST /api/v1/telegram/unlink`

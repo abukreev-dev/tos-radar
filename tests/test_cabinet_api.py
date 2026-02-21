@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from tos_radar.cabinet_api import app
+from tos_radar.cabinet_email_verify_service import EmailVerifyResendError
 from tos_radar.cabinet_models import ChannelStatus, default_notification_settings
 
 
@@ -66,6 +67,46 @@ class CabinetApiTests(unittest.TestCase):
             )
         self.assertEqual(status, 400)
         self.assertEqual(body["error"], "EMAIL_UNVERIFIED")
+
+    def test_post_email_verify_resend(self) -> None:
+        with patch("tos_radar.cabinet_api.validate_and_mark_email_verify_resend"), patch(
+            "tos_radar.cabinet_api.is_session_active",
+            return_value=True,
+        ), patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type("A", (), {"mode": "FULL_ACCESS"})(),
+        ):
+            status, body = _call(
+                "POST",
+                "/api/v1/email/verify/resend",
+                payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+
+    def test_post_email_verify_resend_rate_limit_error(self) -> None:
+        with patch(
+            "tos_radar.cabinet_api.validate_and_mark_email_verify_resend",
+            side_effect=EmailVerifyResendError(
+                "EMAIL_VERIFY_RESEND_RATE_LIMIT",
+                "rate limited",
+            ),
+        ), patch(
+            "tos_radar.cabinet_api.is_session_active",
+            return_value=True,
+        ), patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type("A", (), {"mode": "FULL_ACCESS"})(),
+        ):
+            status, body = _call(
+                "POST",
+                "/api/v1/email/verify/resend",
+                payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s1"},
+            )
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"], "EMAIL_VERIFY_RESEND_RATE_LIMIT")
 
     def test_post_telegram_start(self) -> None:
         with patch("tos_radar.cabinet_api.start_telegram_link", return_value="123456"), patch(

@@ -53,3 +53,12 @@ CREATE TABLE IF NOT EXISTS cabinet_account_lifecycle (
     purge_at VARCHAR(64) NULL,
     PRIMARY KEY (tenant_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS cabinet_email_verify_resend_state (
+    tenant_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    last_sent_at VARCHAR(64) NULL,
+    day_key VARCHAR(16) NULL,
+    day_count INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (tenant_id, user_id)
+);

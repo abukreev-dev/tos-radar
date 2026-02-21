@@ -9,6 +9,10 @@ from tos_radar.cabinet_service import (
     SettingsValidationError,
     apply_notification_settings_update,
 )
+from tos_radar.cabinet_email_verify_service import (
+    EmailVerifyResendError,
+    validate_and_mark_email_verify_resend,
+)
 from tos_radar.cabinet_account_lifecycle_service import (
     AccountLifecycleError,
     get_access_state,
@@ -85,6 +89,20 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             )
             write_notification_settings(tenant_id, user_id, next_settings)
             return _json(start_response, HTTPStatus.OK, next_settings.to_dict())
+
+        if method == "POST" and path == "/api/v1/email/verify/resend":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
+            validate_and_mark_email_verify_resend(
+                tenant_id,
+                user_id,
+                now=datetime.now(UTC),
+                min_interval_sec=60,
+                daily_limit=10,
+            )
+            return _json(start_response, HTTPStatus.OK, {"ok": True})
 
         if method == "POST" and path == "/api/v1/telegram/link/start":
             payload = _read_json(environ)
@@ -241,6 +259,12 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             {"error": exc.code, "message": str(exc)},
         )
     except AccountLifecycleError as exc:
+        return _json(
+            start_response,
+            HTTPStatus.BAD_REQUEST,
+            {"error": exc.code, "message": str(exc)},
+        )
+    except EmailVerifyResendError as exc:
         return _json(
             start_response,
             HTTPStatus.BAD_REQUEST,

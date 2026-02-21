@@ -57,6 +57,7 @@
 ### E1-05 Frontend: resend verify email из уведомлений
 
 - Priority: P1
+- Status: DONE (backend+frontend repos, 2026-02-21)
 - Что сделать: добавить action `Отправить письмо снова` с учетом rate-limit.
 - Depends on: E1-02, E1-03
 - Acceptance:
@@ -126,6 +127,7 @@
 ### E3-02 Frontend: экран `403 доступ ограничен тарифом`
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: реализовать отдельный экран с понятным текстом и CTA.
 - Depends on: E3-01
 - Acceptance:
@@ -147,6 +149,7 @@
 ### E4-01 Frontend: Dashboard KPI + CTA
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: KPI-блок, `Последние изменения`, CTA `Включить уведомления` при выключенных каналах.
 - Depends on: E1-03
 - Acceptance:
