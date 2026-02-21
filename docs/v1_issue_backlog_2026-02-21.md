@@ -273,6 +273,7 @@
 ### E8-02 Release candidate freeze
 
 - Priority: P0
+- Status: DONE (backend scope freeze recorded in `docs/release_candidate_freeze_2026-02-21.md`, 2026-02-21)
 - Что сделать: объявить freeze, закрыть только release-блокеры, подготовить RC.
 - Depends on: E8-01
 - Acceptance:
