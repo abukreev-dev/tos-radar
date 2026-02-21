@@ -3,7 +3,7 @@ VENV ?= .venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
-.PHONY: install init run test lint report-open
+.PHONY: install install-browser init run test lint report-open
 
 install: $(VENV)/bin/python
 
@@ -11,12 +11,14 @@ $(VENV)/bin/python: requirements.txt
 	$(PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
+
+install-browser: install
 	$(PY) -m playwright install chromium
 
-init: install
+init: install-browser
 	$(PY) -m tos_radar.cli init
 
-run: install
+run: install-browser
 	$(PY) -m tos_radar.cli run
 
 test: install

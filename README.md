@@ -2,6 +2,27 @@
 
 Скрипт для ежедневного мониторинга изменений в ToS-документах сервисов.
 
+## Быстрый старт
+
+1. Создать файлы конфигурации:
+- `cp .env.example .env`
+- `cp config/tos_urls.txt.example config/tos_urls.txt`
+- `cp config/proxies.txt.example config/proxies.txt`
+2. Заполнить `config/tos_urls.txt` реальными URL ToS (по одному на строку).
+3. При необходимости заполнить `config/proxies.txt`.
+4. Первый сбор baseline:
+- `make init`
+5. Ежедневный запуск проверки:
+- `make run`
+
+## Make-команды
+
+- `make init` — первый сбор baseline.
+- `make run` — сравнение с baseline и генерация отчета.
+- `make test` — unit-тесты.
+- `make lint` — статический линтинг.
+- `make report-open` — открыть последний HTML-отчет.
+
 ## Планируемые фичи
 
 ### MVP
