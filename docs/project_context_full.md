@@ -195,3 +195,15 @@ CLI:
 
 - Добавлен endpoint `GET /api/v1/billing/plan`.
 - Назначение: отдать `plan_code` (`FREE|PAID_30|PAID_100`) для применения UI ограничений и paywall-сценариев.
+- Добавлен endpoint `POST /api/v1/email/verify/resend` (rate-limit: 60 сек, 10/сутки).
+- Добавлены security notification endpoints:
+  - `POST /api/v1/security/notify/password-changed`
+  - `POST /api/v1/security/notify/email-changed`
+
+## 21) Финальный статус реализации (2026-02-21)
+
+- Backlog задач v1 синхронизирован: все `P0/P1/P2` отмечены `DONE`.
+- Frontend реализован в `../tos-radar-frontend` и покрывает:
+  - `Профиль -> Уведомления` (save/retry/resend verify/telegram controls);
+  - `Каталог`, `Мои сервисы`, `Изменения`, `Дашборд`;
+  - error states `403/404/500` (для `500` есть short error id).

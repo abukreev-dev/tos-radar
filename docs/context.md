@@ -25,6 +25,10 @@
 - Backend acceptance smoke автоматизирован (`make acceptance-smoke`).
 - Добавлен endpoint тарифа: `GET /api/v1/billing/plan`.
 - Добавлен backend acceptance-набор: `make acceptance-backend`.
+- Добавлен resend verify endpoint: `POST /api/v1/email/verify/resend` (rate-limit: 60 сек, 10/сутки).
+- Добавлены security notification endpoints:
+  - `POST /api/v1/security/notify/password-changed`
+  - `POST /api/v1/security/notify/email-changed`
 
 ## Frontend v1 (статус на 2026-02-21)
 
@@ -36,6 +40,18 @@
   - `E3-01` единый inline paywall-компонент, применен в настройках/Telegram/каталоге.
   - `E3-03` QA матрица Free/Paid оформлена и автоматизирована.
 - Источник тарифа для UI: backend `GET /api/v1/billing/plan` (query `restrict=` оставлен как QA override).
+- Закрыты `P1/P2` задачи фронта:
+  - `E1-05` resend verify email;
+  - `E3-02` экран `403`;
+  - `E4-01` dashboard KPI + CTA;
+  - `E4-02` onboarding-чеклист на dashboard;
+  - `E4-03`/`E4-04` My Services + confirm delete;
+  - `E5-01`/`E5-02` Changes feed + empty-state/reset filters;
+  - `E7-01`/`E7-02` унифицированные `404` и `500`.
+
+## Статус v1 scope
+
+- Все задачи `P0/P1/P2` из `docs/v1_issue_backlog_2026-02-21.md` помечены как `DONE`.
 
 ## Цель
 
