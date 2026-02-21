@@ -3,7 +3,7 @@ VENV ?= .venv
 PIP := $(VENV)/bin/pip
 PY := $(VENV)/bin/python
 
-.PHONY: install install-browser init run rerun-failed test lint report-open
+.PHONY: install install-browser init run rerun-failed test lint report-open api-run
 
 install: $(VENV)/bin/python
 
@@ -32,3 +32,6 @@ lint: install
 
 report-open: install
 	$(PY) -m tos_radar.cli report-open
+
+api-run: install
+	$(PY) -m tos_radar.cli api-run

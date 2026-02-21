@@ -21,4 +21,11 @@ def load_settings() -> AppSettings:
         retry_jitter_sec=float(os.getenv("RETRY_JITTER_SEC", "0.4")),
         min_text_length=int(os.getenv("MIN_TEXT_LENGTH", "350")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        api_host=os.getenv("API_HOST", "127.0.0.1"),
+        api_port=int(os.getenv("API_PORT", "8080")),
+        mariadb_host=os.getenv("MARIADB_HOST", "127.0.0.1"),
+        mariadb_port=int(os.getenv("MARIADB_PORT", "3306")),
+        mariadb_database=os.getenv("MARIADB_DATABASE", "tos_radar"),
+        mariadb_user=os.getenv("MARIADB_USER", "tos_radar"),
+        mariadb_password=os.getenv("MARIADB_PASSWORD", ""),
     )

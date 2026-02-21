@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
+
+from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
 
 
 @dataclass(frozen=True)
@@ -33,25 +33,30 @@ class TelegramTestSendState:
         }
 
 
-def _state_path(tenant_id: str, user_id: str) -> Path:
-    return (
-        Path("data")
-        / "cabinet"
-        / tenant_id
-        / "users"
-        / user_id
-        / "telegram_test_send_state.json"
-    )
-
-
 def read_telegram_test_send_state(tenant_id: str, user_id: str) -> TelegramTestSendState:
-    path = _state_path(tenant_id, user_id)
-    if not path.exists():
+    ensure_cabinet_schema()
+    conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT last_sent_at, day_key, day_count
+                FROM cabinet_telegram_test_send_state
+                WHERE tenant_id=%s AND user_id=%s
+                """,
+                (tenant_id, user_id),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
         return TelegramTestSendState()
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("invalid telegram test-send payload: expected object")
-    return TelegramTestSendState.from_dict(payload)
+    return TelegramTestSendState(
+        last_sent_at=row["last_sent_at"],
+        day=row["day_key"],
+        day_count=int(row["day_count"]),
+    )
 
 
 def write_telegram_test_send_state(
@@ -59,9 +64,31 @@ def write_telegram_test_send_state(
     user_id: str,
     state: TelegramTestSendState,
 ) -> None:
-    path = _state_path(tenant_id, user_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(state.to_dict(), ensure_ascii=True, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    ensure_cabinet_schema()
+    conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO cabinet_telegram_test_send_state (
+                    tenant_id,
+                    user_id,
+                    last_sent_at,
+                    day_key,
+                    day_count
+                ) VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    last_sent_at=VALUES(last_sent_at),
+                    day_key=VALUES(day_key),
+                    day_count=VALUES(day_count)
+                """,
+                (
+                    tenant_id,
+                    user_id,
+                    state.last_sent_at,
+                    state.day,
+                    state.day_count,
+                ),
+            )
+    finally:
+        conn.close()

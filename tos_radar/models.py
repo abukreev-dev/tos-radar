@@ -75,6 +75,13 @@ class AppSettings:
     retry_jitter_sec: float
     min_text_length: int
     log_level: str
+    api_host: str
+    api_port: int
+    mariadb_host: str
+    mariadb_port: int
+    mariadb_database: str
+    mariadb_user: str
+    mariadb_password: str
 
 
 @dataclass(frozen=True)

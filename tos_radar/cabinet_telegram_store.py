@@ -1,30 +1,64 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from tos_radar.cabinet_models import TelegramLinkState
-
-
-def _telegram_state_path(tenant_id: str, user_id: str) -> Path:
-    return Path("data") / "cabinet" / tenant_id / "users" / user_id / "telegram_link.json"
+from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
 
 
 def read_telegram_link_state(tenant_id: str, user_id: str) -> TelegramLinkState:
-    path = _telegram_state_path(tenant_id, user_id)
-    if not path.exists():
+    ensure_cabinet_schema()
+    conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT pending_code, code_expires_at, chat_id, linked_at
+                FROM cabinet_telegram_link_state
+                WHERE tenant_id=%s AND user_id=%s
+                """,
+                (tenant_id, user_id),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
         return TelegramLinkState()
-
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("invalid telegram link payload: expected object")
-    return TelegramLinkState.from_dict(payload)
+    return TelegramLinkState(
+        pending_code=row["pending_code"],
+        code_expires_at=row["code_expires_at"],
+        chat_id=row["chat_id"],
+        linked_at=row["linked_at"],
+    )
 
 
 def write_telegram_link_state(tenant_id: str, user_id: str, state: TelegramLinkState) -> None:
-    path = _telegram_state_path(tenant_id, user_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(state.to_dict(), ensure_ascii=True, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    ensure_cabinet_schema()
+    conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO cabinet_telegram_link_state (
+                    tenant_id,
+                    user_id,
+                    pending_code,
+                    code_expires_at,
+                    chat_id,
+                    linked_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    pending_code=VALUES(pending_code),
+                    code_expires_at=VALUES(code_expires_at),
+                    chat_id=VALUES(chat_id),
+                    linked_at=VALUES(linked_at)
+                """,
+                (
+                    tenant_id,
+                    user_id,
+                    state.pending_code,
+                    state.code_expires_at,
+                    state.chat_id,
+                    state.linked_at,
+                ),
+            )
+    finally:
+        conn.close()

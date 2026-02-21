@@ -5,6 +5,7 @@
 ## Текущее состояние
 
 - Стек: `Python 3.12 + Playwright + pypdf`.
+- Для backend кабинета используется `MariaDB` (через `pymysql`).
 - Режимы: `init`, `run`, `rerun-failed`, `report-open`.
 - Входные URL: `config/tos_urls.txt` (дубли домена автоматически пропускаются, берется первый URL домена).
 - Поддержка HTML и прямых PDF URL.
@@ -100,6 +101,13 @@ https://example.org/tos.pdf
 - `RETRY_JITTER_SEC` (по умолчанию `0.4`)
 - `MIN_TEXT_LENGTH` (по умолчанию `350`, только для HTML)
 - `LOG_LEVEL` (по умолчанию `INFO`)
+- `API_HOST` (по умолчанию `127.0.0.1`)
+- `API_PORT` (по умолчанию `8080`)
+- `MARIADB_HOST` (по умолчанию `127.0.0.1`)
+- `MARIADB_PORT` (по умолчанию `3306`)
+- `MARIADB_DATABASE` (по умолчанию `tos_radar`)
+- `MARIADB_USER` (по умолчанию `tos_radar`)
+- `MARIADB_PASSWORD` (по умолчанию пусто)
 
 ## Поведение режимов
 
@@ -153,6 +161,7 @@ https://example.org/tos.pdf
 - `make test`
 - `make lint`
 - `make report-open`
+- `make api-run`
 
 ## Тесты
 
