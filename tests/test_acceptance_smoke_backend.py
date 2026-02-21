@@ -112,6 +112,9 @@ class _MemoryBackend:
     def active_count(self, tenant_id: str, user_id: str) -> int:
         return len(self.active_sessions.get((tenant_id, user_id), set()))
 
+    def is_session_active(self, tenant_id: str, user_id: str, session_id: str) -> bool:
+        return session_id in self.active_sessions.get((tenant_id, user_id), set())
+
     def start_soft_delete(self, tenant_id: str, user_id: str, now=None):
         ts = now or datetime.now(UTC)
         state = AccountLifecycleState(
@@ -132,12 +135,20 @@ class _MemoryBackend:
             return type(
                 "A",
                 (),
-                {"to_dict": lambda self: {"mode": "FULL_ACCESS", "soft_deleted_at": None, "purge_at": None}},
+                {
+                    "mode": "FULL_ACCESS",
+                    "to_dict": lambda self: {
+                        "mode": "FULL_ACCESS",
+                        "soft_deleted_at": None,
+                        "purge_at": None,
+                    },
+                },
             )()
         return type(
             "A",
             (),
             {
+                "mode": "RECOVERY_ONLY",
                 "to_dict": lambda self: {
                     "mode": "RECOVERY_ONLY",
                     "soft_deleted_at": state.soft_deleted_at,
@@ -167,12 +178,21 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
         ), patch(
             "tos_radar.cabinet_api.get_active_sessions_count", side_effect=mem.active_count
         ), patch(
+            "tos_radar.cabinet_api.is_session_active", side_effect=mem.is_session_active
+        ), patch(
             "tos_radar.cabinet_api.start_soft_delete", side_effect=mem.start_soft_delete
         ), patch(
             "tos_radar.cabinet_api.restore_account", side_effect=mem.restore_account
         ), patch(
             "tos_radar.cabinet_api.get_access_state", side_effect=mem.access_state
         ):
+            status, _ = _call(
+                "POST",
+                "/api/v1/security/sessions/create",
+                payload={"tenant_id": "t1", "user_id": "u1", "session_id": "s1"},
+            )
+            self.assertEqual(status, 200)
+
             status, body = _call(
                 "POST",
                 "/api/v1/notification-settings",
@@ -182,6 +202,7 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                     "email_verified": False,
                     "email_digest_enabled": True,
                 },
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 400)
             self.assertEqual(body["error"], "EMAIL_UNVERIFIED")
@@ -190,6 +211,7 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                 "POST",
                 "/api/v1/telegram/link/start",
                 payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 200)
             self.assertEqual(body["code"], "111111")
@@ -203,6 +225,7 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                     "code": "111111",
                     "chat_id": "chat-1",
                 },
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 200)
 
@@ -210,6 +233,7 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                 "POST",
                 "/api/v1/telegram/test-send",
                 payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 200)
 
@@ -227,6 +251,7 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                 "GET",
                 "/api/v1/security/active-sessions",
                 query="tenant_id=t1&user_id=u1",
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 200)
             self.assertEqual(body["active_sessions"], 2)
@@ -235,14 +260,31 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
                 "POST",
                 "/api/v1/security/revoke-all-sessions",
                 payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s1"},
             )
             self.assertEqual(status, 200)
             self.assertEqual(body["revoked_sessions"], 2)
 
             status, body = _call(
+                "GET",
+                "/api/v1/notification-settings",
+                query="tenant_id=t1&user_id=u1",
+                headers={"X-Session-Id": "s1"},
+            )
+            self.assertEqual(status, 401)
+            self.assertEqual(body["error"], "SESSION_REVOKED")
+
+            _call(
+                "POST",
+                "/api/v1/security/sessions/create",
+                payload={"tenant_id": "t1", "user_id": "u1", "session_id": "s2"},
+            )
+
+            status, body = _call(
                 "POST",
                 "/api/v1/account/soft-delete/start",
                 payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s2"},
             )
             self.assertEqual(status, 200)
             self.assertEqual(body["status"], "SOFT_DELETED")
@@ -254,6 +296,15 @@ class BackendAcceptanceSmokeTests(unittest.TestCase):
             )
             self.assertEqual(status, 200)
             self.assertEqual(body["mode"], "RECOVERY_ONLY")
+
+            status, body = _call(
+                "POST",
+                "/api/v1/telegram/link/start",
+                payload={"tenant_id": "t1", "user_id": "u1"},
+                headers={"X-Session-Id": "s2"},
+            )
+            self.assertEqual(status, 400)
+            self.assertEqual(body["error"], "ACCOUNT_RECOVERY_ONLY")
 
             status, body = _call(
                 "POST",
@@ -270,6 +321,7 @@ def _call(
     *,
     query: str = "",
     payload: dict | None = None,
+    headers: dict[str, str] | None = None,
 ) -> tuple[int, dict]:
     body_bytes = json.dumps(payload or {}).encode("utf-8")
     environ = {
@@ -279,6 +331,8 @@ def _call(
         "CONTENT_LENGTH": str(len(body_bytes)),
         "wsgi.input": io.BytesIO(body_bytes),
     }
+    for k, v in (headers or {}).items():
+        environ[f"HTTP_{k.upper().replace('-', '_')}"] = v
     response_status: dict[str, str] = {}
 
     def start_response(status: str, headers):  # type: ignore[no-untyped-def]

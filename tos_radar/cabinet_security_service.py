@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from tos_radar.cabinet_security_store import (
     count_active_sessions,
     create_session_record,
+    is_session_active as is_session_active_store,
     revoke_all_active_sessions,
 )
 
@@ -32,3 +33,7 @@ def revoke_all_sessions_for_password_change(
 
 def get_active_sessions_count(tenant_id: str, user_id: str) -> int:
     return count_active_sessions(tenant_id, user_id)
+
+
+def is_session_active(tenant_id: str, user_id: str, session_id: str) -> bool:
+    return is_session_active_store(tenant_id, user_id, session_id)

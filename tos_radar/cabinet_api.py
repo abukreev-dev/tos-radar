@@ -18,6 +18,7 @@ from tos_radar.cabinet_account_lifecycle_service import (
 from tos_radar.cabinet_security_service import (
     create_session,
     get_active_sessions_count,
+    is_session_active,
     revoke_all_sessions_for_password_change,
 )
 from tos_radar.cabinet_store import read_notification_settings, write_notification_settings
@@ -29,7 +30,14 @@ from tos_radar.cabinet_telegram_service import (
     unlink_telegram,
 )
 from tos_radar.cabinet_telegram_test_service import validate_and_mark_telegram_test_send
+from tos_radar.cabinet_telegram_transport import send_telegram_test_message
 from tos_radar.mariadb import ping_mariadb
+
+
+class SessionAuthError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def run_api_server(host: str, port: int) -> None:
@@ -54,6 +62,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             params = _parse_query(environ)
             tenant_id = _require_str(params, "tenant_id")
             user_id = _require_str(params, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             settings = read_notification_settings(tenant_id, user_id)
             return _json(start_response, HTTPStatus.OK, settings.to_dict())
 
@@ -62,6 +71,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
             email_verified = _require_bool(payload, "email_verified")
+            _authorize_request(environ, path, tenant_id, user_id)
 
             current = read_notification_settings(tenant_id, user_id)
             next_settings = apply_notification_settings_update(
@@ -79,6 +89,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             payload = _read_json(environ)
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             code = start_telegram_link(tenant_id, user_id, now=datetime.now(UTC))
             return _json(start_response, HTTPStatus.OK, {"code": code})
 
@@ -88,6 +99,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             user_id = _require_str(payload, "user_id")
             code = _require_str(payload, "code")
             chat_id = _require_str(payload, "chat_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             current = read_notification_settings(tenant_id, user_id)
             next_settings = confirm_telegram_link(
                 tenant_id,
@@ -104,6 +116,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             payload = _read_json(environ)
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             current = read_notification_settings(tenant_id, user_id)
             next_settings = unlink_telegram(tenant_id, user_id, current_settings=current)
             write_notification_settings(tenant_id, user_id, next_settings)
@@ -116,6 +129,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             reason = payload.get("reason_message")
             if reason is not None and not isinstance(reason, str):
                 raise ValueError("invalid 'reason_message': expected string")
+            _authorize_request(environ, path, tenant_id, user_id)
             current = read_notification_settings(tenant_id, user_id)
             next_settings = mark_telegram_disconnected(
                 tenant_id,
@@ -131,13 +145,15 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             payload = _read_json(environ)
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
-            validate_and_mark_telegram_test_send(
+            _authorize_request(environ, path, tenant_id, user_id)
+            chat_id = validate_and_mark_telegram_test_send(
                 tenant_id,
                 user_id,
                 now=datetime.now(UTC),
                 min_interval_sec=60,
                 daily_limit=20,
             )
+            send_telegram_test_message(chat_id, "Test digest message from tos-radar.")
             return _json(start_response, HTTPStatus.OK, {"ok": True})
 
         if method == "POST" and path == "/api/v1/security/sessions/create":
@@ -152,6 +168,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             payload = _read_json(environ)
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             revoked = revoke_all_sessions_for_password_change(
                 tenant_id,
                 user_id,
@@ -163,6 +180,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             params = _parse_query(environ)
             tenant_id = _require_str(params, "tenant_id")
             user_id = _require_str(params, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             count = get_active_sessions_count(tenant_id, user_id)
             return _json(start_response, HTTPStatus.OK, {"active_sessions": count})
 
@@ -170,6 +188,7 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             payload = _read_json(environ)
             tenant_id = _require_str(payload, "tenant_id")
             user_id = _require_str(payload, "user_id")
+            _authorize_request(environ, path, tenant_id, user_id)
             state = start_soft_delete(tenant_id, user_id, now=datetime.now(UTC))
             return _json(
                 start_response,
@@ -216,6 +235,12 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
         return _json(
             start_response,
             HTTPStatus.BAD_REQUEST,
+            {"error": exc.code, "message": str(exc)},
+        )
+    except SessionAuthError as exc:
+        return _json(
+            start_response,
+            HTTPStatus.UNAUTHORIZED,
             {"error": exc.code, "message": str(exc)},
         )
     except ValueError as exc:
@@ -276,3 +301,28 @@ def _require_bool(payload: dict, key: str) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"invalid '{key}': expected bool")
     return value
+
+
+def _authorize_request(environ: dict, path: str, tenant_id: str, user_id: str) -> None:
+    _enforce_recovery_mode(path, tenant_id, user_id)
+    session_id = environ.get("HTTP_X_SESSION_ID")
+    if not isinstance(session_id, str) or not session_id:
+        raise SessionAuthError(
+            code="SESSION_REQUIRED",
+            message="Missing X-Session-Id header.",
+        )
+    if not is_session_active(tenant_id, user_id, session_id):
+        raise SessionAuthError(
+            code="SESSION_REVOKED",
+            message="Session is not active.",
+        )
+
+
+def _enforce_recovery_mode(path: str, tenant_id: str, user_id: str) -> None:
+    allowed = {"/api/v1/account/access-state", "/api/v1/account/soft-delete/restore"}
+    access = get_access_state(tenant_id, user_id, now=datetime.now(UTC))
+    if access.mode == "RECOVERY_ONLY" and path not in allowed:
+        raise AccountLifecycleError(
+            code="ACCOUNT_RECOVERY_ONLY",
+            message="Account is in recovery mode. Only restore is allowed.",
+        )

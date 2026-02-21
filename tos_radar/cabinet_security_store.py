@@ -61,3 +61,21 @@ def count_active_sessions(tenant_id: str, user_id: str) -> int:
             return int(row["cnt"]) if row else 0
     finally:
         conn.close()
+
+
+def is_session_active(tenant_id: str, user_id: str, session_id: str) -> bool:
+    conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT is_active
+                FROM cabinet_user_sessions
+                WHERE tenant_id=%s AND user_id=%s AND session_id=%s
+                """,
+                (tenant_id, user_id, session_id),
+            )
+            row = cur.fetchone()
+            return bool(row and row["is_active"])
+    finally:
+        conn.close()

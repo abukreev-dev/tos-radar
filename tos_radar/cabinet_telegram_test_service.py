@@ -18,7 +18,7 @@ def validate_and_mark_telegram_test_send(
     now: datetime | None = None,
     min_interval_sec: int = 60,
     daily_limit: int = 20,
-) -> None:
+) -> str:
     ts = now or datetime.now(UTC)
     link_state = read_telegram_link_state(tenant_id, user_id)
     if not link_state.chat_id:
@@ -46,6 +46,7 @@ def validate_and_mark_telegram_test_send(
             day_count=next_count,
         ),
     )
+    return link_state.chat_id
 
 
 def _validate_rate_limits(
