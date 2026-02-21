@@ -11,6 +11,12 @@ class Status(str, Enum):
     FAILED = "FAILED"
 
 
+class ChangeLevel(str, Enum):
+    NOISE = "NOISE"
+    MINOR = "MINOR"
+    MAJOR = "MAJOR"
+
+
 @dataclass(frozen=True)
 class Service:
     domain: str
@@ -89,6 +95,8 @@ class RunEntry:
     source_type: SourceType | None
     duration_sec: float
     text_length: int | None
+    change_level: ChangeLevel | None
+    change_ratio: float | None
     error_code: ErrorCode | None
     error: str | None
     diff_html: str | None

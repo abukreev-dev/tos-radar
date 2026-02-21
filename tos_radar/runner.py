@@ -8,6 +8,7 @@ import subprocess
 import time
 
 from tos_radar.config import load_proxies, load_services
+from tos_radar.change_classifier import classify_change
 from tos_radar.diff_utils import build_diff_html, is_changed
 from tos_radar.fetcher import fetch_with_retries
 from tos_radar.models import AppSettings
@@ -95,6 +96,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=None,
                         duration_sec=elapsed,
                         text_length=None,
+                        change_level=None,
+                        change_ratio=None,
                         error_code=ErrorCode.TIMEOUT,
                         error=err,
                         diff_html=None,
@@ -109,6 +112,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=None,
                         duration_sec=elapsed,
                         text_length=None,
+                        change_level=None,
+                        change_ratio=None,
                         error_code=result.error_code,
                         error=result.error,
                         diff_html=None,
@@ -126,6 +131,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=result.source_type,
                         duration_sec=elapsed,
                         text_length=len(text),
+                        change_level=None,
+                        change_ratio=None,
                         error_code=code,
                         error=message,
                         diff_html=None,
@@ -141,6 +148,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=result.source_type,
                         duration_sec=elapsed,
                         text_length=len(text),
+                        change_level=None,
+                        change_ratio=None,
                         error_code=None,
                         error=None,
                         diff_html=None,
@@ -157,15 +166,24 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=result.source_type,
                         duration_sec=elapsed,
                         text_length=len(text),
+                        change_level=None,
+                        change_ratio=None,
                         error_code=None,
                         error=None,
                         diff_html=None,
                     )
 
                 if is_changed(prev, text):
+                    change_level, change_ratio = classify_change(prev, text)
                     diff_html = build_diff_html(prev, text)
                     write_current_and_rotate(service.domain, text)
-                    LOGGER.info("CHANGED domain=%s source=%s", service.domain, result.source_type.value)
+                    LOGGER.info(
+                        "CHANGED domain=%s source=%s change_level=%s change_ratio=%.4f",
+                        service.domain,
+                        result.source_type.value,
+                        change_level.value,
+                        change_ratio,
+                    )
                     return RunEntry(
                         domain=service.domain,
                         url=service.url,
@@ -173,6 +191,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         source_type=result.source_type,
                         duration_sec=elapsed,
                         text_length=len(text),
+                        change_level=change_level,
+                        change_ratio=change_ratio,
                         error_code=None,
                         error=None,
                         diff_html=diff_html,
@@ -186,6 +206,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     source_type=result.source_type,
                     duration_sec=elapsed,
                     text_length=len(text),
+                    change_level=None,
+                    change_ratio=None,
                     error_code=None,
                     error=None,
                     diff_html=None,
@@ -200,6 +222,8 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     source_type=None,
                     duration_sec=elapsed,
                     text_length=None,
+                    change_level=None,
+                    change_ratio=None,
                     error_code=ErrorCode.UNKNOWN,
                     error=f"Unhandled runner error: {exc}",
                     diff_html=None,

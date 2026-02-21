@@ -4,6 +4,7 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 
+from tos_radar.change_classifier import is_suspicious_changed
 from tos_radar.models import RunEntry
 
 
@@ -25,6 +26,14 @@ def find_latest_report() -> Path | None:
 
 
 def _render(entries: list[RunEntry], mode: str) -> str:
+    suspicious = [
+        e
+        for e in entries
+        if e.status.value == "CHANGED"
+        and e.change_level is not None
+        and e.change_ratio is not None
+        and is_suspicious_changed(e.change_level, e.change_ratio, e.text_length)
+    ]
     rows = []
     for entry in entries:
         diff_block = entry.diff_html or ""
@@ -32,6 +41,8 @@ def _render(entries: list[RunEntry], mode: str) -> str:
         error_code = entry.error_code.value if entry.error_code else "-"
         source = entry.source_type.value if entry.source_type else "-"
         text_length = str(entry.text_length) if entry.text_length is not None else "-"
+        change_level = entry.change_level.value if entry.change_level else "-"
+        change_ratio = f"{entry.change_ratio:.4f}" if entry.change_ratio is not None else "-"
         rows.append(
             f"""
             <section class="card status-{entry.status.value.lower()}">
@@ -42,6 +53,8 @@ def _render(entries: list[RunEntry], mode: str) -> str:
                 <div><b>source</b>: {source}</div>
                 <div><b>duration</b>: {entry.duration_sec:.2f}s</div>
                 <div><b>text_length</b>: {text_length}</div>
+                <div><b>change_level</b>: {change_level}</div>
+                <div><b>change_ratio</b>: {change_ratio}</div>
                 <div><b>error_code</b>: {error_code}</div>
                 <div><b>error</b>: {error or "-"}</div>
               </div>
@@ -81,7 +94,29 @@ def _render(entries: list[RunEntry], mode: str) -> str:
     <div>Mode: {escape(mode)}</div>
   </header>
   <main>
+    {_render_suspicious(suspicious)}
     {''.join(rows)}
   </main>
 </body>
 </html>"""
+
+
+def _render_suspicious(entries: list[RunEntry]) -> str:
+    if not entries:
+        return ""
+    items = []
+    for entry in entries:
+        ratio = f"{entry.change_ratio:.4f}" if entry.change_ratio is not None else "-"
+        items.append(
+            f"<li>{escape(entry.domain)} "
+            f"(level={entry.change_level.value if entry.change_level else '-'}, "
+            f"ratio={ratio}, "
+            f"text_length={entry.text_length if entry.text_length is not None else '-'})</li>"
+        )
+    return (
+        '<section class="card" style="border-left-color:#8a2be2;">'
+        "<h3>Suspicious CHANGED</h3>"
+        "<ul>"
+        + "".join(items)
+        + "</ul></section>"
+    )
