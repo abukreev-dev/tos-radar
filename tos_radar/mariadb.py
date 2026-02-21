@@ -96,5 +96,30 @@ def ensure_cabinet_schema() -> None:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cabinet_user_sessions (
+                    tenant_id VARCHAR(64) NOT NULL,
+                    user_id VARCHAR(128) NOT NULL,
+                    session_id VARCHAR(128) NOT NULL,
+                    issued_at VARCHAR(64) NOT NULL,
+                    revoked_at VARCHAR(64) NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1,
+                    PRIMARY KEY (tenant_id, user_id, session_id)
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cabinet_account_lifecycle (
+                    tenant_id VARCHAR(64) NOT NULL,
+                    user_id VARCHAR(128) NOT NULL,
+                    status VARCHAR(32) NOT NULL,
+                    soft_deleted_at VARCHAR(64) NULL,
+                    purge_at VARCHAR(64) NULL,
+                    PRIMARY KEY (tenant_id, user_id)
+                )
+                """
+            )
     finally:
         conn.close()

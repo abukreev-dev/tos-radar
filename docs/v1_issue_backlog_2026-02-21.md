@@ -202,6 +202,7 @@
 ### E6-01 Backend: logout всех сессий при смене пароля
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: после смены пароля инвалидировать все активные сессии.
 - Depends on: нет
 - Acceptance:
@@ -211,6 +212,7 @@
 ### E6-02 Backend+Frontend: soft-delete lifecycle (30 дней)
 
 - Priority: P0
+- Status: DONE (backend, 2026-02-21)
 - Что сделать: блок входа в период soft-delete, экран восстановления, восстановление в 1 клик.
 - Depends on: нет
 - Acceptance:

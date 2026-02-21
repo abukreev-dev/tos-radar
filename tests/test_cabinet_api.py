@@ -91,6 +91,59 @@ class CabinetApiTests(unittest.TestCase):
         self.assertFalse(body["telegram_digest_enabled"])
         mocked_disconnected.assert_called_once()
 
+    def test_revoke_all_sessions_endpoint(self) -> None:
+        with patch("tos_radar.cabinet_api.revoke_all_sessions_for_password_change", return_value=4):
+            status, body = _call(
+                "POST",
+                "/api/v1/security/revoke-all-sessions",
+                payload={"tenant_id": "t1", "user_id": "u1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["revoked_sessions"], 4)
+
+    def test_soft_delete_start_and_access_state(self) -> None:
+        with patch(
+            "tos_radar.cabinet_api.start_soft_delete",
+            return_value=type(
+                "S",
+                (),
+                {
+                    "status": type("St", (), {"value": "SOFT_DELETED"})(),
+                    "soft_deleted_at": "2026-02-21T10:00:00+00:00",
+                    "purge_at": "2026-03-23T10:00:00+00:00",
+                },
+            )(),
+        ):
+            status, body = _call(
+                "POST",
+                "/api/v1/account/soft-delete/start",
+                payload={"tenant_id": "t1", "user_id": "u1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "SOFT_DELETED")
+
+        with patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type(
+                "A",
+                (),
+                {
+                    "to_dict": lambda self: {
+                        "mode": "RECOVERY_ONLY",
+                        "soft_deleted_at": "2026-02-21T10:00:00+00:00",
+                        "purge_at": "2026-03-23T10:00:00+00:00",
+                    }
+                },
+            )(),
+        ):
+            status, body = _call(
+                "GET",
+                "/api/v1/account/access-state",
+                query="tenant_id=t1&user_id=u1",
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["mode"], "RECOVERY_ONLY")
+
 
 def _call(
     method: str,

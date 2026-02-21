@@ -9,6 +9,17 @@ from tos_radar.cabinet_service import (
     SettingsValidationError,
     apply_notification_settings_update,
 )
+from tos_radar.cabinet_account_lifecycle_service import (
+    AccountLifecycleError,
+    get_access_state,
+    restore_account,
+    start_soft_delete,
+)
+from tos_radar.cabinet_security_service import (
+    create_session,
+    get_active_sessions_count,
+    revoke_all_sessions_for_password_change,
+)
 from tos_radar.cabinet_store import read_notification_settings, write_notification_settings
 from tos_radar.cabinet_telegram_service import (
     TelegramLinkError,
@@ -122,6 +133,65 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             )
             return _json(start_response, HTTPStatus.OK, {"ok": True})
 
+        if method == "POST" and path == "/api/v1/security/sessions/create":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            session_id = _require_str(payload, "session_id")
+            create_session(tenant_id, user_id, session_id, now=datetime.now(UTC))
+            return _json(start_response, HTTPStatus.OK, {"ok": True})
+
+        if method == "POST" and path == "/api/v1/security/revoke-all-sessions":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            revoked = revoke_all_sessions_for_password_change(
+                tenant_id,
+                user_id,
+                now=datetime.now(UTC),
+            )
+            return _json(start_response, HTTPStatus.OK, {"revoked_sessions": revoked})
+
+        if method == "GET" and path == "/api/v1/security/active-sessions":
+            params = _parse_query(environ)
+            tenant_id = _require_str(params, "tenant_id")
+            user_id = _require_str(params, "user_id")
+            count = get_active_sessions_count(tenant_id, user_id)
+            return _json(start_response, HTTPStatus.OK, {"active_sessions": count})
+
+        if method == "POST" and path == "/api/v1/account/soft-delete/start":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            state = start_soft_delete(tenant_id, user_id, now=datetime.now(UTC))
+            return _json(
+                start_response,
+                HTTPStatus.OK,
+                {
+                    "status": state.status.value,
+                    "soft_deleted_at": state.soft_deleted_at,
+                    "purge_at": state.purge_at,
+                },
+            )
+
+        if method == "POST" and path == "/api/v1/account/soft-delete/restore":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            state = restore_account(tenant_id, user_id, now=datetime.now(UTC))
+            return _json(
+                start_response,
+                HTTPStatus.OK,
+                {"status": state.status.value},
+            )
+
+        if method == "GET" and path == "/api/v1/account/access-state":
+            params = _parse_query(environ)
+            tenant_id = _require_str(params, "tenant_id")
+            user_id = _require_str(params, "user_id")
+            access = get_access_state(tenant_id, user_id, now=datetime.now(UTC))
+            return _json(start_response, HTTPStatus.OK, access.to_dict())
+
         return _json(start_response, HTTPStatus.NOT_FOUND, {"error": "NOT_FOUND"})
     except SettingsValidationError as exc:
         return _json(
@@ -130,6 +200,12 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             {"error": exc.code, "message": str(exc)},
         )
     except TelegramLinkError as exc:
+        return _json(
+            start_response,
+            HTTPStatus.BAD_REQUEST,
+            {"error": exc.code, "message": str(exc)},
+        )
+    except AccountLifecycleError as exc:
         return _json(
             start_response,
             HTTPStatus.BAD_REQUEST,

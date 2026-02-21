@@ -13,6 +13,12 @@ class ChannelStatus(str, Enum):
     ERROR = "ERROR"
 
 
+class AccountStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    SOFT_DELETED = "SOFT_DELETED"
+    PURGED = "PURGED"
+
+
 @dataclass(frozen=True)
 class ChannelError:
     code: str
@@ -43,6 +49,13 @@ class TelegramLinkState:
             chat_id=_expect_optional_str(data, "chat_id"),
             linked_at=_expect_optional_str(data, "linked_at"),
         )
+
+
+@dataclass(frozen=True)
+class AccountLifecycleState:
+    status: AccountStatus
+    soft_deleted_at: str | None = None
+    purge_at: str | None = None
 
 
 @dataclass(frozen=True)
