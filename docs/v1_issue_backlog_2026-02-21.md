@@ -89,6 +89,7 @@
 ### E2-03 Backend: обработка `telegram disconnected`
 
 - Priority: P0
+- Status: DONE (2026-02-21)
 - Что сделать: при потере связки автоматически отключать Telegram-дайджест и отдавать причину.
 - Depends on: E2-01
 - Acceptance:

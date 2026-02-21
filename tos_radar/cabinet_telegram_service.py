@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from random import randint
 
 from tos_radar.cabinet_models import (
+    ChannelError,
     ChannelStatus,
     NotificationSettings,
     TelegramLinkState,
@@ -80,6 +81,29 @@ def unlink_telegram(
         telegram_system_enabled=False,
         telegram_status=ChannelStatus.DISCONNECTED,
         telegram_error=None,
+    )
+
+
+def mark_telegram_disconnected(
+    tenant_id: str,
+    user_id: str,
+    *,
+    current_settings: NotificationSettings,
+    reason_message: str = "Telegram channel disconnected. Reconnect is required.",
+    now: datetime | None = None,
+) -> NotificationSettings:
+    ts = now or datetime.now(UTC)
+    write_telegram_link_state(tenant_id, user_id, TelegramLinkState())
+    return replace(
+        current_settings,
+        telegram_digest_enabled=False,
+        telegram_system_enabled=False,
+        telegram_status=ChannelStatus.DISCONNECTED,
+        telegram_error=ChannelError(
+            code="TELEGRAM_DISCONNECTED",
+            message=reason_message,
+            updated_at=ts.isoformat(),
+        ),
     )
 
 

@@ -8,6 +8,7 @@ from tos_radar.cabinet_models import ChannelStatus, TelegramLinkState, default_n
 from tos_radar.cabinet_telegram_service import (
     TelegramLinkError,
     confirm_telegram_link,
+    mark_telegram_disconnected,
     start_telegram_link,
     unlink_telegram,
 )
@@ -105,6 +106,40 @@ class CabinetTelegramServiceTests(unittest.TestCase):
         self.assertFalse(after_unlink.telegram_digest_enabled)
         self.assertFalse(after_unlink.telegram_system_enabled)
         self.assertEqual(after_unlink.telegram_status, ChannelStatus.DISCONNECTED)
+        self.assertEqual(captured[-1], TelegramLinkState())
+
+    def test_mark_disconnected_sets_reason_and_resets_toggles(self) -> None:
+        captured: list[TelegramLinkState] = []
+        now = datetime(2026, 2, 21, 12, 30, 0, tzinfo=UTC)
+        with patch(
+            "tos_radar.cabinet_telegram_service.write_telegram_link_state",
+            side_effect=lambda _t, _u, s: captured.append(s),
+        ):
+            linked = default_notification_settings().__class__(
+                email_digest_enabled=False,
+                telegram_digest_enabled=True,
+                email_marketing_enabled=False,
+                telegram_system_enabled=True,
+                email_status=ChannelStatus.UNVERIFIED,
+                telegram_status=ChannelStatus.ENABLED,
+                email_error=None,
+                telegram_error=None,
+            )
+            next_settings = mark_telegram_disconnected(
+                "t1",
+                "u1",
+                current_settings=linked,
+                reason_message="Bot blocked by user",
+                now=now,
+            )
+
+        self.assertFalse(next_settings.telegram_digest_enabled)
+        self.assertFalse(next_settings.telegram_system_enabled)
+        self.assertEqual(next_settings.telegram_status, ChannelStatus.DISCONNECTED)
+        self.assertIsNotNone(next_settings.telegram_error)
+        self.assertEqual(next_settings.telegram_error.code, "TELEGRAM_DISCONNECTED")
+        self.assertEqual(next_settings.telegram_error.message, "Bot blocked by user")
+        self.assertEqual(next_settings.telegram_error.updated_at, now.isoformat())
         self.assertEqual(captured[-1], TelegramLinkState())
 
 

@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from tos_radar.cabinet_api import app
-from tos_radar.cabinet_models import default_notification_settings
+from tos_radar.cabinet_models import ChannelStatus, default_notification_settings
 
 
 class CabinetApiTests(unittest.TestCase):
@@ -51,6 +51,45 @@ class CabinetApiTests(unittest.TestCase):
             )
         self.assertEqual(status, 200)
         self.assertEqual(body["code"], "123456")
+
+    def test_post_telegram_disconnected(self) -> None:
+        current = default_notification_settings().__class__(
+            email_digest_enabled=False,
+            telegram_digest_enabled=True,
+            email_marketing_enabled=False,
+            telegram_system_enabled=True,
+            email_status=ChannelStatus.UNVERIFIED,
+            telegram_status=ChannelStatus.ENABLED,
+            email_error=None,
+            telegram_error=None,
+        )
+        next_settings = default_notification_settings().__class__(
+            email_digest_enabled=False,
+            telegram_digest_enabled=False,
+            email_marketing_enabled=False,
+            telegram_system_enabled=False,
+            email_status=ChannelStatus.UNVERIFIED,
+            telegram_status=ChannelStatus.DISCONNECTED,
+            email_error=None,
+            telegram_error=None,
+        )
+        with patch("tos_radar.cabinet_api.read_notification_settings", return_value=current), patch(
+            "tos_radar.cabinet_api.mark_telegram_disconnected",
+            return_value=next_settings,
+        ) as mocked_disconnected, patch("tos_radar.cabinet_api.write_notification_settings"):
+            status, body = _call(
+                "POST",
+                "/api/v1/telegram/disconnected",
+                payload={
+                    "tenant_id": "t1",
+                    "user_id": "u1",
+                    "reason_message": "Bot blocked by user",
+                },
+            )
+
+        self.assertEqual(status, 200)
+        self.assertFalse(body["telegram_digest_enabled"])
+        mocked_disconnected.assert_called_once()
 
 
 def _call(

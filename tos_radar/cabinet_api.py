@@ -13,6 +13,7 @@ from tos_radar.cabinet_store import read_notification_settings, write_notificati
 from tos_radar.cabinet_telegram_service import (
     TelegramLinkError,
     confirm_telegram_link,
+    mark_telegram_disconnected,
     start_telegram_link,
     unlink_telegram,
 )
@@ -87,6 +88,24 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
             user_id = _require_str(payload, "user_id")
             current = read_notification_settings(tenant_id, user_id)
             next_settings = unlink_telegram(tenant_id, user_id, current_settings=current)
+            write_notification_settings(tenant_id, user_id, next_settings)
+            return _json(start_response, HTTPStatus.OK, next_settings.to_dict())
+
+        if method == "POST" and path == "/api/v1/telegram/disconnected":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            reason = payload.get("reason_message")
+            if reason is not None and not isinstance(reason, str):
+                raise ValueError("invalid 'reason_message': expected string")
+            current = read_notification_settings(tenant_id, user_id)
+            next_settings = mark_telegram_disconnected(
+                tenant_id,
+                user_id,
+                current_settings=current,
+                reason_message=reason or "Telegram channel disconnected. Reconnect is required.",
+                now=datetime.now(UTC),
+            )
             write_notification_settings(tenant_id, user_id, next_settings)
             return _json(start_response, HTTPStatus.OK, next_settings.to_dict())
 
