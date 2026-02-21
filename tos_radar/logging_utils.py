@@ -5,8 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 
-def setup_logging(level: str) -> Path:
-    logs_dir = Path("logs")
+def setup_logging(level: str, tenant_id: str) -> Path:
+    logs_dir = Path("logs") / tenant_id
     logs_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_file = logs_dir / f"run-{ts}.log"

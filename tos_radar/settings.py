@@ -10,6 +10,7 @@ from tos_radar.models import AppSettings
 def load_settings() -> AppSettings:
     load_dotenv()
     return AppSettings(
+        tenant_id=os.getenv("TENANT_ID", "default"),
         tos_urls_file=os.getenv("TOS_URLS_FILE", "config/tos_urls.txt"),
         proxies_file=os.getenv("PROXIES_FILE", "config/proxies.txt"),
         concurrency=int(os.getenv("CONCURRENCY", "20")),

@@ -43,8 +43,8 @@ class RunnerFailedUrlsTests(unittest.TestCase):
                         diff_html=None,
                     ),
                 ]
-                _write_last_failed_urls(entries)
-                self.assertTrue(Path("data/last_failed_urls.txt").exists())
-                self.assertEqual(_read_last_failed_urls(), ["https://a.com/tos"])
+                _write_last_failed_urls("tenant-a", entries)
+                self.assertTrue(Path("data/tenant-a/last_failed_urls.txt").exists())
+                self.assertEqual(_read_last_failed_urls("tenant-a"), ["https://a.com/tos"])
             finally:
                 os.chdir(old)

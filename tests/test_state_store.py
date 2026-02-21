@@ -13,9 +13,9 @@ class StateStoreTests(unittest.TestCase):
             old_cwd = os.getcwd()
             os.chdir(tmp)
             try:
-                write_current_and_rotate("example.com", "v1")
-                self.assertEqual(read_current("example.com"), "v1")
-                write_current_and_rotate("example.com", "v2")
-                self.assertEqual(read_current("example.com"), "v2")
+                write_current_and_rotate("t1", "example.com", "v1")
+                self.assertEqual(read_current("t1", "example.com"), "v1")
+                write_current_and_rotate("t1", "example.com", "v2")
+                self.assertEqual(read_current("t1", "example.com"), "v2")
             finally:
                 os.chdir(old_cwd)

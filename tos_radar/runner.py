@@ -20,7 +20,6 @@ from tos_radar.report import find_latest_report, write_report
 from tos_radar.state_store import read_current, write_current_and_rotate
 
 LOGGER = logging.getLogger(__name__)
-LAST_FAILED_URLS_PATH = Path("data/last_failed_urls.txt")
 
 
 def run_init(settings: AppSettings) -> int:
@@ -32,7 +31,7 @@ def run_scan(settings: AppSettings) -> int:
 
 
 def run_rerun_failed(settings: AppSettings) -> int:
-    failed_urls = _read_last_failed_urls()
+    failed_urls = _read_last_failed_urls(settings.tenant_id)
     if not failed_urls:
         LOGGER.info("No failed URLs from previous run.")
         return 0
@@ -41,8 +40,8 @@ def run_rerun_failed(settings: AppSettings) -> int:
     return asyncio.run(_run(mode="run", settings=settings, services_override=services))
 
 
-def open_last_report() -> int:
-    latest = find_latest_report()
+def open_last_report(settings: AppSettings) -> int:
+    latest = find_latest_report(settings.tenant_id)
     if latest is None:
         LOGGER.error("No reports found.")
         return 1
@@ -152,7 +151,7 @@ async def _run(mode: str, settings: AppSettings, services_override: list[Service
                     )
 
                 if mode == "init":
-                    write_current_and_rotate(service.domain, text)
+                    write_current_and_rotate(settings.tenant_id, service.domain, text)
                     LOGGER.info("NEW domain=%s source=%s", service.domain, result.source_type.value)
                     return RunEntry(
                         domain=service.domain,
@@ -168,9 +167,9 @@ async def _run(mode: str, settings: AppSettings, services_override: list[Service
                         diff_html=None,
                     )
 
-                prev = read_current(service.domain)
+                prev = read_current(settings.tenant_id, service.domain)
                 if prev is None:
-                    write_current_and_rotate(service.domain, text)
+                    write_current_and_rotate(settings.tenant_id, service.domain, text)
                     LOGGER.info("NEW domain=%s source=%s", service.domain, result.source_type.value)
                     return RunEntry(
                         domain=service.domain,
@@ -189,7 +188,7 @@ async def _run(mode: str, settings: AppSettings, services_override: list[Service
                 if is_changed(prev, text):
                     change_level, change_ratio = classify_change(prev, text)
                     diff_html = build_diff_html(prev, text)
-                    write_current_and_rotate(service.domain, text)
+                    write_current_and_rotate(settings.tenant_id, service.domain, text)
                     LOGGER.info(
                         "CHANGED domain=%s source=%s change_level=%s change_ratio=%.4f",
                         service.domain,
@@ -274,8 +273,8 @@ async def _run(mode: str, settings: AppSettings, services_override: list[Service
             entries = list(merged_entries.values())
 
     entries.sort(key=lambda e: e.domain)
-    _write_last_failed_urls(entries)
-    report_path = write_report(entries, mode)
+    _write_last_failed_urls(settings.tenant_id, entries)
+    report_path = write_report(entries, mode, settings.tenant_id)
     LOGGER.info("Report generated: %s", report_path)
     return 0
 
@@ -315,21 +314,27 @@ def _quality_gate_error(
     return None
 
 
-def _write_last_failed_urls(entries: list[RunEntry]) -> None:
+def _write_last_failed_urls(tenant_id: str, entries: list[RunEntry]) -> None:
     failed_urls = sorted({entry.url for entry in entries if entry.status == Status.FAILED})
-    LAST_FAILED_URLS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    LAST_FAILED_URLS_PATH.write_text("\n".join(failed_urls), encoding="utf-8")
+    path = _last_failed_urls_path(tenant_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(failed_urls), encoding="utf-8")
 
 
-def _read_last_failed_urls() -> list[str]:
-    if not LAST_FAILED_URLS_PATH.exists():
+def _read_last_failed_urls(tenant_id: str) -> list[str]:
+    path = _last_failed_urls_path(tenant_id)
+    if not path.exists():
         return []
     lines = []
-    for raw in LAST_FAILED_URLS_PATH.read_text(encoding="utf-8").splitlines():
+    for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if line:
             lines.append(line)
     return lines
+
+
+def _last_failed_urls_path(tenant_id: str) -> Path:
+    return Path("data") / tenant_id / "last_failed_urls.txt"
 
 
 def _services_from_urls(urls: list[str]) -> list[Service]:

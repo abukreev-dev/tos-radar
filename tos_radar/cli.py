@@ -14,7 +14,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = load_settings()
-    setup_logging(settings.log_level)
+    setup_logging(settings.log_level, settings.tenant_id)
 
     if args.command == "init":
         return run_init(settings)
@@ -22,7 +22,7 @@ def main() -> int:
         return run_scan(settings)
     if args.command == "rerun-failed":
         return run_rerun_failed(settings)
-    return open_last_report()
+    return open_last_report(settings)
 
 
 if __name__ == "__main__":

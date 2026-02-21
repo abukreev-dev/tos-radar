@@ -64,6 +64,7 @@ class Proxy:
 
 @dataclass(frozen=True)
 class AppSettings:
+    tenant_id: str
     tos_urls_file: str
     proxies_file: str
     concurrency: int

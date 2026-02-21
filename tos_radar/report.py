@@ -8,8 +8,8 @@ from tos_radar.change_classifier import is_suspicious_changed
 from tos_radar.models import RunEntry
 
 
-def write_report(entries: list[RunEntry], mode: str) -> Path:
-    reports_dir = Path("reports")
+def write_report(entries: list[RunEntry], mode: str, tenant_id: str) -> Path:
+    reports_dir = Path("reports") / tenant_id
     reports_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     report_path = reports_dir / f"report-{ts}.html"
@@ -17,8 +17,8 @@ def write_report(entries: list[RunEntry], mode: str) -> Path:
     return report_path
 
 
-def find_latest_report() -> Path | None:
-    reports_dir = Path("reports")
+def find_latest_report(tenant_id: str) -> Path | None:
+    reports_dir = Path("reports") / tenant_id
     if not reports_dir.exists():
         return None
     reports = sorted(reports_dir.glob("report-*.html"))
