@@ -202,6 +202,7 @@
 ### E5-02 Frontend: empty-state + CTA `Сбросить фильтры`
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: отдельный empty-state для пустой выборки.
 - Depends on: E5-01
 - Acceptance:
@@ -233,6 +234,7 @@
 ### E6-03 Notifications: security emails
 
 - Priority: P1
+- Status: DONE (backend repo `tos-radar`, 2026-02-21)
 - Что сделать: отправка email при смене пароля и при смене email (на старый и новый адрес).
 - Depends on: нет
 - Acceptance:
@@ -244,6 +246,7 @@
 ### E7-01 Frontend: унифицированный `404`
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: экран `404` с CTA `На дашборд`.
 - Depends on: нет
 - Acceptance:

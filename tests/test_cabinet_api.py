@@ -188,6 +188,45 @@ class CabinetApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["revoked_sessions"], 4)
 
+    def test_notify_password_changed_endpoint(self) -> None:
+        with patch("tos_radar.cabinet_api.notify_password_changed", return_value={"sent": 1, "failed": 0}), patch(
+            "tos_radar.cabinet_api.is_session_active",
+            return_value=True,
+        ), patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type("A", (), {"mode": "FULL_ACCESS"})(),
+        ):
+            status, body = _call(
+                "POST",
+                "/api/v1/security/notify/password-changed",
+                payload={"tenant_id": "t1", "user_id": "u1", "email": "user@example.com"},
+                headers={"X-Session-Id": "s1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["sent"], 1)
+
+    def test_notify_email_changed_endpoint(self) -> None:
+        with patch("tos_radar.cabinet_api.notify_email_changed", return_value={"sent": 2, "failed": 0}), patch(
+            "tos_radar.cabinet_api.is_session_active",
+            return_value=True,
+        ), patch(
+            "tos_radar.cabinet_api.get_access_state",
+            return_value=type("A", (), {"mode": "FULL_ACCESS"})(),
+        ):
+            status, body = _call(
+                "POST",
+                "/api/v1/security/notify/email-changed",
+                payload={
+                    "tenant_id": "t1",
+                    "user_id": "u1",
+                    "old_email": "old@example.com",
+                    "new_email": "new@example.com",
+                },
+                headers={"X-Session-Id": "s1"},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["sent"], 2)
+
     def test_telegram_test_send_calls_transport(self) -> None:
         with patch(
             "tos_radar.cabinet_api.validate_and_mark_telegram_test_send",

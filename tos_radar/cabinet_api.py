@@ -26,6 +26,10 @@ from tos_radar.cabinet_security_service import (
     is_session_active,
     revoke_all_sessions_for_password_change,
 )
+from tos_radar.cabinet_security_email_service import (
+    notify_email_changed,
+    notify_password_changed,
+)
 from tos_radar.cabinet_store import read_notification_settings, write_notification_settings
 from tos_radar.cabinet_telegram_service import (
     TelegramLinkError,
@@ -194,6 +198,25 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
                 now=datetime.now(UTC),
             )
             return _json(start_response, HTTPStatus.OK, {"revoked_sessions": revoked})
+
+        if method == "POST" and path == "/api/v1/security/notify/password-changed":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            email = _require_str(payload, "email")
+            _authorize_request(environ, path, tenant_id, user_id)
+            result = notify_password_changed(tenant_id, user_id, email)
+            return _json(start_response, HTTPStatus.OK, result)
+
+        if method == "POST" and path == "/api/v1/security/notify/email-changed":
+            payload = _read_json(environ)
+            tenant_id = _require_str(payload, "tenant_id")
+            user_id = _require_str(payload, "user_id")
+            old_email = _require_str(payload, "old_email")
+            new_email = _require_str(payload, "new_email")
+            _authorize_request(environ, path, tenant_id, user_id)
+            result = notify_email_changed(tenant_id, user_id, old_email, new_email)
+            return _json(start_response, HTTPStatus.OK, result)
 
         if method == "GET" and path == "/api/v1/security/active-sessions":
             params = _parse_query(environ)

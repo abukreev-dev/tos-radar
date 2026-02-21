@@ -46,6 +46,8 @@ Health-check:
 - `POST /api/v1/security/sessions/create`
 - `POST /api/v1/security/revoke-all-sessions`
 - `GET /api/v1/security/active-sessions`
+- `POST /api/v1/security/notify/password-changed`
+- `POST /api/v1/security/notify/email-changed`
 - `POST /api/v1/account/soft-delete/start`
 - `POST /api/v1/account/soft-delete/restore`
 - `GET /api/v1/account/access-state`
