@@ -89,6 +89,9 @@ https://example.org/tos.pdf
 - `CONCURRENCY` (по умолчанию `20`)
 - `TIMEOUT_SEC` (по умолчанию `60`)
 - `RETRY_PROXY_COUNT` (по умолчанию `3`)
+- `RETRY_BACKOFF_BASE_SEC` (по умолчанию `0.8`)
+- `RETRY_BACKOFF_MAX_SEC` (по умолчанию `8.0`)
+- `RETRY_JITTER_SEC` (по умолчанию `0.4`)
 - `LOG_LEVEL` (по умолчанию `INFO`)
 
 ## Поведение `init` и `run`
@@ -105,6 +108,7 @@ https://example.org/tos.pdf
 - Если есть изменение, статус `CHANGED`, создается diff, baseline обновляется.
 - Если изменений нет, статус `UNCHANGED`.
 - Если документ получить не удалось, статус `FAILED`, baseline не меняется.
+- Для `FAILED` в отчете фиксируются `error_code` и текст ошибки.
 - Если baseline отсутствует для домена, запись получает `NEW`.
 
 ## Ретраи и прокси
@@ -112,6 +116,7 @@ https://example.org/tos.pdf
 - Попытка 1: без прокси.
 - Дальше: до `RETRY_PROXY_COUNT` прокси из `config/proxies.txt`.
 - На каждую попытку действует `TIMEOUT_SEC`.
+- Между попытками используется exponential backoff с jitter.
 - При успешной последней попытке именно она считается финальным результатом URL.
 
 ## Что считается изменением
