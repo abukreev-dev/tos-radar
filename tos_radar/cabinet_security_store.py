@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
+from tos_radar.mariadb import connect_mariadb
 
 
 def create_session_record(
@@ -9,7 +9,6 @@ def create_session_record(
     session_id: str,
     issued_at: str,
 ) -> None:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -30,7 +29,6 @@ def create_session_record(
 
 
 def revoke_all_active_sessions(tenant_id: str, user_id: str, revoked_at: str) -> int:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -48,7 +46,6 @@ def revoke_all_active_sessions(tenant_id: str, user_id: str, revoked_at: str) ->
 
 
 def count_active_sessions(tenant_id: str, user_id: str) -> int:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:

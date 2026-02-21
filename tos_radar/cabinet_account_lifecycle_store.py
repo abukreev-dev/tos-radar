@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from tos_radar.cabinet_models import AccountLifecycleState, AccountStatus
-from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
+from tos_radar.mariadb import connect_mariadb
 
 
 def read_account_lifecycle_state(tenant_id: str, user_id: str) -> AccountLifecycleState:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -35,7 +34,6 @@ def write_account_lifecycle_state(
     user_id: str,
     state: AccountLifecycleState,
 ) -> None:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
+from tos_radar.mariadb import connect_mariadb
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,6 @@ class TelegramTestSendState:
 
 
 def read_telegram_test_send_state(tenant_id: str, user_id: str) -> TelegramTestSendState:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -64,7 +63,6 @@ def write_telegram_test_send_state(
     user_id: str,
     state: TelegramTestSendState,
 ) -> None:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:

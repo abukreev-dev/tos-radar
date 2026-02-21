@@ -5,6 +5,7 @@ import sys
 
 from tos_radar.cabinet_api import run_api_server
 from tos_radar.logging_utils import setup_logging
+from tos_radar.mariadb import apply_mariadb_migrations
 from tos_radar.runner import open_last_report, run_init, run_rerun_failed, run_scan
 from tos_radar.settings import load_settings
 
@@ -12,7 +13,8 @@ from tos_radar.settings import load_settings
 def main() -> int:
     parser = argparse.ArgumentParser(prog="tos-radar")
     parser.add_argument(
-        "command", choices=["init", "run", "rerun-failed", "report-open", "api-run"]
+        "command",
+        choices=["init", "run", "rerun-failed", "report-open", "api-run", "db-migrate"],
     )
     args = parser.parse_args()
 
@@ -27,6 +29,10 @@ def main() -> int:
         return run_rerun_failed(settings)
     if args.command == "api-run":
         run_api_server(settings.api_host, settings.api_port)
+        return 0
+    if args.command == "db-migrate":
+        applied = apply_mariadb_migrations()
+        print(f"migrations applied: {applied}")
         return 0
     return open_last_report(settings)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -46,80 +47,46 @@ def connect_mariadb() -> Any:
     )
 
 
-def ensure_cabinet_schema() -> None:
+def ping_mariadb() -> None:
     conn = connect_mariadb()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 AS ok")
+    finally:
+        conn.close()
+
+
+def apply_mariadb_migrations() -> int:
+    conn = connect_mariadb()
+    applied = 0
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS cabinet_notification_settings (
-                    tenant_id VARCHAR(64) NOT NULL,
-                    user_id VARCHAR(128) NOT NULL,
-                    email_digest_enabled TINYINT(1) NOT NULL,
-                    telegram_digest_enabled TINYINT(1) NOT NULL,
-                    email_marketing_enabled TINYINT(1) NOT NULL,
-                    telegram_system_enabled TINYINT(1) NOT NULL,
-                    email_status VARCHAR(32) NOT NULL,
-                    telegram_status VARCHAR(32) NOT NULL,
-                    email_error_code VARCHAR(128) NULL,
-                    email_error_message TEXT NULL,
-                    email_error_updated_at VARCHAR(64) NULL,
-                    telegram_error_code VARCHAR(128) NULL,
-                    telegram_error_message TEXT NULL,
-                    telegram_error_updated_at VARCHAR(64) NULL,
-                    PRIMARY KEY (tenant_id, user_id)
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version VARCHAR(128) NOT NULL PRIMARY KEY,
+                    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cabinet_telegram_link_state (
-                    tenant_id VARCHAR(64) NOT NULL,
-                    user_id VARCHAR(128) NOT NULL,
-                    pending_code VARCHAR(16) NULL,
-                    code_expires_at VARCHAR(64) NULL,
-                    chat_id VARCHAR(128) NULL,
-                    linked_at VARCHAR(64) NULL,
-                    PRIMARY KEY (tenant_id, user_id)
+            migration_dir = Path(__file__).resolve().parent.parent / "migrations"
+            for path in sorted(migration_dir.glob("*.sql")):
+                version = path.name
+                cur.execute(
+                    "SELECT version FROM schema_migrations WHERE version=%s",
+                    (version,),
                 )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cabinet_telegram_test_send_state (
-                    tenant_id VARCHAR(64) NOT NULL,
-                    user_id VARCHAR(128) NOT NULL,
-                    last_sent_at VARCHAR(64) NULL,
-                    day_key VARCHAR(16) NULL,
-                    day_count INT NOT NULL DEFAULT 0,
-                    PRIMARY KEY (tenant_id, user_id)
+                if cur.fetchone():
+                    continue
+
+                sql = path.read_text(encoding="utf-8")
+                for statement in [s.strip() for s in sql.split(";") if s.strip()]:
+                    cur.execute(statement)
+                cur.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (%s)",
+                    (version,),
                 )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cabinet_user_sessions (
-                    tenant_id VARCHAR(64) NOT NULL,
-                    user_id VARCHAR(128) NOT NULL,
-                    session_id VARCHAR(128) NOT NULL,
-                    issued_at VARCHAR(64) NOT NULL,
-                    revoked_at VARCHAR(64) NULL,
-                    is_active TINYINT(1) NOT NULL DEFAULT 1,
-                    PRIMARY KEY (tenant_id, user_id, session_id)
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS cabinet_account_lifecycle (
-                    tenant_id VARCHAR(64) NOT NULL,
-                    user_id VARCHAR(128) NOT NULL,
-                    status VARCHAR(32) NOT NULL,
-                    soft_deleted_at VARCHAR(64) NULL,
-                    purge_at VARCHAR(64) NULL,
-                    PRIMARY KEY (tenant_id, user_id)
-                )
-                """
-            )
+                applied += 1
     finally:
         conn.close()
+    return applied

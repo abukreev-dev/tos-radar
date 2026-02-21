@@ -50,6 +50,11 @@ cp config/proxies.txt.example config/proxies.txt
 make init
 ```
 
+Для backend кабинета сначала применить миграции MariaDB:
+```bash
+make db-migrate
+```
+
 4. Обычный запуск:
 ```bash
 make run
@@ -162,6 +167,8 @@ https://example.org/tos.pdf
 - `make lint`
 - `make report-open`
 - `make api-run`
+- `make db-migrate`
+- `make acceptance-smoke`
 
 ## Тесты
 

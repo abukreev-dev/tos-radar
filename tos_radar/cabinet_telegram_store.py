@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from tos_radar.cabinet_models import TelegramLinkState
-from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
+from tos_radar.mariadb import connect_mariadb
 
 
 def read_telegram_link_state(tenant_id: str, user_id: str) -> TelegramLinkState:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -31,7 +30,6 @@ def read_telegram_link_state(tenant_id: str, user_id: str) -> TelegramLinkState:
 
 
 def write_telegram_link_state(tenant_id: str, user_id: str, state: TelegramLinkState) -> None:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:

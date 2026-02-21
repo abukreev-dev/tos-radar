@@ -10,6 +10,13 @@ from tos_radar.cabinet_models import ChannelStatus, default_notification_setting
 
 
 class CabinetApiTests(unittest.TestCase):
+    def test_health_endpoint(self) -> None:
+        with patch("tos_radar.cabinet_api.ping_mariadb"):
+            status, body = _call("GET", "/api/v1/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["db"], "up")
+
     def test_get_notification_settings(self) -> None:
         with patch(
             "tos_radar.cabinet_api.read_notification_settings",

@@ -73,10 +73,7 @@ class _FakeConnection:
 class CabinetStoreTests(unittest.TestCase):
     def test_read_returns_defaults_when_record_missing(self) -> None:
         storage: dict[tuple[str, str], dict] = {}
-        with patch("tos_radar.cabinet_store.ensure_cabinet_schema"), patch(
-            "tos_radar.cabinet_store.connect_mariadb",
-            return_value=_FakeConnection(storage),
-        ):
+        with patch("tos_radar.cabinet_store.connect_mariadb", return_value=_FakeConnection(storage)):
             settings = read_notification_settings("t1", "u1")
             self.assertFalse(settings.email_digest_enabled)
             self.assertFalse(settings.telegram_digest_enabled)
@@ -85,10 +82,7 @@ class CabinetStoreTests(unittest.TestCase):
 
     def test_write_and_read_roundtrip(self) -> None:
         storage: dict[tuple[str, str], dict] = {}
-        with patch("tos_radar.cabinet_store.ensure_cabinet_schema"), patch(
-            "tos_radar.cabinet_store.connect_mariadb",
-            return_value=_FakeConnection(storage),
-        ):
+        with patch("tos_radar.cabinet_store.connect_mariadb", return_value=_FakeConnection(storage)):
             initial = NotificationSettings(
                 email_digest_enabled=True,
                 telegram_digest_enabled=True,
@@ -124,10 +118,7 @@ class CabinetStoreTests(unittest.TestCase):
                 "telegram_error_updated_at": None,
             }
         }
-        with patch("tos_radar.cabinet_store.ensure_cabinet_schema"), patch(
-            "tos_radar.cabinet_store.connect_mariadb",
-            return_value=_FakeConnection(storage),
-        ):
+        with patch("tos_radar.cabinet_store.connect_mariadb", return_value=_FakeConnection(storage)):
             with self.assertRaises(ValueError):
                 read_notification_settings("t1", "u1")
 

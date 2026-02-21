@@ -6,11 +6,10 @@ from tos_radar.cabinet_models import (
     NotificationSettings,
     default_notification_settings,
 )
-from tos_radar.mariadb import connect_mariadb, ensure_cabinet_schema
+from tos_radar.mariadb import connect_mariadb
 
 
 def read_notification_settings(tenant_id: str, user_id: str) -> NotificationSettings:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:
@@ -63,7 +62,6 @@ def read_notification_settings(tenant_id: str, user_id: str) -> NotificationSett
 def write_notification_settings(
     tenant_id: str, user_id: str, settings: NotificationSettings
 ) -> None:
-    ensure_cabinet_schema()
     conn = connect_mariadb()
     try:
         with conn.cursor() as cur:

@@ -29,11 +29,10 @@ from tos_radar.cabinet_telegram_service import (
     unlink_telegram,
 )
 from tos_radar.cabinet_telegram_test_service import validate_and_mark_telegram_test_send
-from tos_radar.mariadb import ensure_cabinet_schema
+from tos_radar.mariadb import ping_mariadb
 
 
 def run_api_server(host: str, port: int) -> None:
-    ensure_cabinet_schema()
     with make_server(host, port, app) as server:
         print(f"cabinet-api listening on http://{host}:{port}")
         server.serve_forever()
@@ -43,6 +42,14 @@ def app(environ: dict, start_response):  # type: ignore[no-untyped-def]
     method = environ.get("REQUEST_METHOD", "GET")
     path = environ.get("PATH_INFO", "")
     try:
+        if method == "GET" and path == "/api/v1/health":
+            ping_mariadb()
+            return _json(
+                start_response,
+                HTTPStatus.OK,
+                {"status": "ok", "db": "up"},
+            )
+
         if method == "GET" and path == "/api/v1/notification-settings":
             params = _parse_query(environ)
             tenant_id = _require_str(params, "tenant_id")
