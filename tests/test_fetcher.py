@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from tos_radar.fetcher import build_attempts, classify_untyped_error, compute_retry_delay
+from tos_radar.fetcher import (
+    build_attempts,
+    classify_untyped_error,
+    compute_retry_delay,
+    _looks_like_binary_doc_url,
+)
 from tos_radar.models import ErrorCode, Proxy
 
 
@@ -31,3 +36,10 @@ class FetcherTests(unittest.TestCase):
         self.assertEqual(classify_untyped_error(RuntimeError("request timeout")), ErrorCode.TIMEOUT)
         self.assertEqual(classify_untyped_error(RuntimeError("proxy auth 407")), ErrorCode.PROXY)
         self.assertEqual(classify_untyped_error(RuntimeError("connection reset")), ErrorCode.NETWORK)
+        self.assertEqual(classify_untyped_error(RuntimeError("verify you are human")), ErrorCode.BOT_DETECTED)
+
+    def test_binary_doc_url_detection(self) -> None:
+        self.assertTrue(_looks_like_binary_doc_url("https://mkb.ru/file/abc-123"))
+        self.assertTrue(_looks_like_binary_doc_url("https://site.com/attachment/1"))
+        self.assertTrue(_looks_like_binary_doc_url("https://site.com/docs/terms.pdf"))
+        self.assertFalse(_looks_like_binary_doc_url("https://alfabank.ru/retail/tariffs/"))

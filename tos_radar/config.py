@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
 from tos_radar.models import Proxy, Service
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _read_non_empty_lines(path: str) -> list[str]:
@@ -31,8 +34,8 @@ def load_services(path: str) -> list[Service]:
             msg = f"Invalid URL in {path}: {line}"
             raise ValueError(msg)
         if domain in seen_domains:
-            msg = f"Duplicate domain in {path}: {domain}"
-            raise ValueError(msg)
+            LOGGER.warning("Skip duplicate domain=%s url=%s", domain, line)
+            continue
         seen_domains.add(domain)
         services.append(Service(domain=domain, url=line))
 

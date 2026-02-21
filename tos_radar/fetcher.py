@@ -6,13 +6,21 @@ import math
 import random
 import re
 from io import BytesIO
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 from urllib.error import URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from tos_radar.models import ErrorCode, FetchResult, Proxy, Service, SourceType
 
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+
 LOGGER = logging.getLogger(__name__)
+REALISTIC_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/133.0.0.0 Safari/537.36"
+)
 
 
 class FetchError(RuntimeError):
@@ -37,43 +45,22 @@ async def fetch_with_retries(
 
     for idx, proxy in enumerate(attempts, start=1):
         try:
-            if service.url.lower().endswith(".pdf"):
-                text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
-                cleaned_text = _clean_extracted_text(text)
-                if not cleaned_text:
-                    raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
-                return FetchResult(
-                    ok=True,
-                    text=cleaned_text,
-                    source_type=SourceType.PDF,
-                    attempt=idx,
-                    proxy_used=proxy.to_proxy_url() if proxy else None,
-                )
-
-            html_text, maybe_pdf = await _fetch_html_text(service.url, timeout_sec, proxy)
-            if maybe_pdf:
-                text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
-                cleaned_text = _clean_extracted_text(text)
-                if not cleaned_text:
-                    raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
-                return FetchResult(
-                    ok=True,
-                    text=cleaned_text,
-                    source_type=SourceType.PDF,
-                    attempt=idx,
-                    proxy_used=proxy.to_proxy_url() if proxy else None,
-                )
-
-            cleaned_text = _clean_extracted_text(html_text)
-            if not cleaned_text:
-                raise FetchError(ErrorCode.EMPTY_CONTENT, "Page contains no extractable text")
-
-            return FetchResult(
-                ok=True,
-                text=cleaned_text,
-                source_type=SourceType.HTML,
-                attempt=idx,
-                proxy_used=proxy.to_proxy_url() if proxy else None,
+            result = await asyncio.wait_for(
+                _fetch_single_attempt(service=service, timeout_sec=timeout_sec, proxy=proxy, attempt=idx),
+                timeout=timeout_sec + 20,
+            )
+            return result
+        except TimeoutError:
+            last_error = f"Attempt timed out after hard limit ({timeout_sec + 20}s)"
+            last_error_code = ErrorCode.TIMEOUT
+            LOGGER.warning(
+                "Fetch failed domain=%s attempt=%s/%s proxy=%s code=%s error=%s",
+                service.domain,
+                idx,
+                total_attempts,
+                proxy.to_proxy_url() if proxy else "none",
+                ErrorCode.TIMEOUT.value,
+                last_error,
             )
         except FetchError as exc:
             last_error = str(exc)
@@ -121,6 +108,60 @@ async def fetch_with_retries(
     )
 
 
+async def _fetch_single_attempt(service: Service, timeout_sec: int, proxy: Proxy | None, attempt: int) -> FetchResult:
+    if service.url.lower().endswith(".pdf"):
+        text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
+        cleaned_text = _clean_extracted_text(text)
+        if not cleaned_text:
+            raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
+        return FetchResult(
+            ok=True,
+            text=cleaned_text,
+            source_type=SourceType.PDF,
+            attempt=attempt,
+            proxy_used=proxy.to_proxy_url() if proxy else None,
+        )
+
+    html_text, maybe_pdf = await _fetch_html_text(service.url, timeout_sec, proxy)
+    if maybe_pdf:
+        text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
+        cleaned_text = _clean_extracted_text(text)
+        if not cleaned_text:
+            raise FetchError(ErrorCode.EMPTY_CONTENT, "PDF contains no extractable text")
+        return FetchResult(
+            ok=True,
+            text=cleaned_text,
+            source_type=SourceType.PDF,
+            attempt=attempt,
+            proxy_used=proxy.to_proxy_url() if proxy else None,
+        )
+
+    cleaned_text = _clean_extracted_text(html_text)
+    if not cleaned_text:
+        if _looks_like_binary_doc_url(service.url):
+            pdf_text = await _fetch_pdf_text_with_browser(service.url, timeout_sec, proxy)
+            if not pdf_text:
+                pdf_text = await _fetch_pdf_text(service.url, timeout_sec, proxy)
+            cleaned_pdf_text = _clean_extracted_text(pdf_text)
+            if cleaned_pdf_text:
+                return FetchResult(
+                    ok=True,
+                    text=cleaned_pdf_text,
+                    source_type=SourceType.PDF,
+                    attempt=attempt,
+                    proxy_used=proxy.to_proxy_url() if proxy else None,
+                )
+        raise FetchError(ErrorCode.EMPTY_CONTENT, "Page contains no extractable text")
+
+    return FetchResult(
+        ok=True,
+        text=cleaned_text,
+        source_type=SourceType.HTML,
+        attempt=attempt,
+        proxy_used=proxy.to_proxy_url() if proxy else None,
+    )
+
+
 def build_attempts(proxies: Sequence[Proxy], retry_proxy_count: int) -> list[Proxy | None]:
     attempts: list[Proxy | None] = [None]
     attempts.extend(list(proxies)[:retry_proxy_count])
@@ -141,6 +182,18 @@ def compute_retry_delay(
 
 def classify_untyped_error(exc: Exception) -> ErrorCode:
     message = str(exc).lower()
+    if any(
+        token in message
+        for token in (
+            "captcha",
+            "verify you are human",
+            "are you human",
+            "access denied",
+            "bot",
+            "unusual traffic",
+        )
+    ):
+        return ErrorCode.BOT_DETECTED
     if "timeout" in message:
         return ErrorCode.TIMEOUT
     if "proxy" in message or "407" in message:
@@ -160,7 +213,14 @@ async def _fetch_html_text(url: str, timeout_sec: int, proxy: Proxy | None) -> t
         msg = "Playwright is not installed. Run: python -m playwright install chromium"
         raise FetchError(ErrorCode.BROWSER, msg) from exc
 
-    launch_kwargs: dict[str, object] = {"headless": True}
+    launch_kwargs: dict[str, object] = {
+        "headless": True,
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-first-run",
+        ],
+    }
     if proxy is not None:
         launch_kwargs["proxy"] = proxy.to_playwright_proxy()
 
@@ -168,7 +228,28 @@ async def _fetch_html_text(url: str, timeout_sec: int, proxy: Proxy | None) -> t
         async with async_playwright() as p:
             browser = await p.chromium.launch(**launch_kwargs)
             try:
-                page = await browser.new_page()
+                context = await browser.new_context(
+                    user_agent=REALISTIC_USER_AGENT,
+                    locale="ru-RU",
+                    timezone_id="Europe/Moscow",
+                    viewport={"width": 1366, "height": 768},
+                    java_script_enabled=True,
+                    extra_http_headers={
+                        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                        "Upgrade-Insecure-Requests": "1",
+                        "DNT": "1",
+                    },
+                )
+                await context.add_init_script(
+                    """
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
+                    Object.defineProperty(navigator, 'language', {get: () => 'ru-RU'});
+                    Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU', 'ru', 'en-US', 'en']});
+                    window.chrome = window.chrome || { runtime: {} };
+                    """
+                )
+                page = await context.new_page()
                 response = await page.goto(url, timeout=timeout_sec * 1000, wait_until="domcontentloaded")
                 if response is None:
                     raise FetchError(ErrorCode.NETWORK, "No response from target page")
@@ -177,7 +258,10 @@ async def _fetch_html_text(url: str, timeout_sec: int, proxy: Proxy | None) -> t
                 if "application/pdf" in content_type:
                     return "", True
 
-                await page.wait_for_timeout(1200)
+                await _simulate_human_interaction(page)
+                if await _looks_like_bot_block(page):
+                    raise FetchError(ErrorCode.BOT_DETECTED, "Anti-bot page detected")
+
                 text = await page.evaluate(
                     """() => {
                       const selectorsToDrop = [
@@ -221,7 +305,8 @@ async def _fetch_html_text(url: str, timeout_sec: int, proxy: Proxy | None) -> t
                     }"""
                 )
                 if not text or not text.strip():
-                    text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                    text = await _extract_with_fallback(page, timeout_sec)
+                await context.close()
                 return text, False
             except PlaywrightTimeoutError as exc:
                 raise FetchError(ErrorCode.TIMEOUT, f"Page timeout after {timeout_sec}s") from exc
@@ -242,6 +327,48 @@ async def _fetch_pdf_text(url: str, timeout_sec: int, proxy: Proxy | None) -> st
     return await asyncio.to_thread(_extract_text_from_pdf, data)
 
 
+async def _fetch_pdf_text_with_browser(url: str, timeout_sec: int, proxy: Proxy | None) -> str:
+    try:
+        from playwright.async_api import async_playwright
+    except Exception:
+        return ""
+
+    launch_kwargs: dict[str, object] = {
+        "headless": True,
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-first-run",
+        ],
+    }
+    if proxy is not None:
+        launch_kwargs["proxy"] = proxy.to_playwright_proxy()
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(**launch_kwargs)
+        try:
+            context = await browser.new_context(
+                user_agent=REALISTIC_USER_AGENT,
+                locale="ru-RU",
+                timezone_id="Europe/Moscow",
+                extra_http_headers={
+                    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Accept": "application/pdf,text/html;q=0.9,*/*;q=0.8",
+                },
+            )
+            response = await context.request.get(url, timeout=timeout_sec * 1000)
+            body = await response.body()
+            content_type = (response.headers.get("content-type") or "").lower()
+            if "application/pdf" in content_type or body.startswith(b"%PDF"):
+                return await asyncio.to_thread(_extract_text_from_pdf, body)
+
+            if _looks_like_bot_block_text(_safe_decode(body)):
+                raise FetchError(ErrorCode.BOT_DETECTED, "Anti-bot page detected for binary document URL")
+            return ""
+        finally:
+            await browser.close()
+
+
 def _download_pdf(url: str, timeout_sec: int, proxy: Proxy | None) -> bytes:
     handlers = []
     if proxy is not None:
@@ -251,7 +378,11 @@ def _download_pdf(url: str, timeout_sec: int, proxy: Proxy | None) -> bytes:
     opener = build_opener(*handlers)
     req = Request(
         url,
-        headers={"User-Agent": "tos-radar/0.1 (+https://example.local)"},
+        headers={
+            "User-Agent": REALISTIC_USER_AGENT,
+            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept": "application/pdf,text/html;q=0.9,*/*;q=0.8",
+        },
     )
     try:
         with opener.open(req, timeout=timeout_sec) as response:  # type: ignore[arg-type]
@@ -286,13 +417,22 @@ def _clean_extracted_text(text: str) -> str:
         "newsletter",
         "accept all",
         "reject all",
+        "мы сохраняем «куки»",
+        "мы сохраняем \"куки\"",
+        "help and feedback",
     )
     for raw in lines:
         line = re.sub(r"\s+", " ", raw).strip()
         if not line:
             continue
         lower = line.lower()
+        if lower.startswith("©") or "лицензия банка россии" in lower:
+            continue
+        if "помощь и обратная связь" in lower and len(line) < 220:
+            continue
         if any(token in lower for token in noise_tokens) and len(line) < 160:
+            continue
+        if any(token in lower for token in ("сохраняем «куки»", "сохраняем \"куки\"")):
             continue
         words = line.split()
         url_like = sum(1 for w in words if "http://" in w.lower() or "https://" in w.lower())
@@ -302,3 +442,64 @@ def _clean_extracted_text(text: str) -> str:
             continue
         out.append(line)
     return "\n".join(out).strip()
+
+
+def _looks_like_binary_doc_url(url: str) -> bool:
+    lower = url.lower()
+    return any(token in lower for token in ("/file/", "/attachment", ".pdf", "download"))
+
+
+async def _simulate_human_interaction(page: "Page") -> None:
+    # A short random delay + scroll often reduces naive automation checks.
+    wait_ms = random.randint(1400, 2600)
+    await page.wait_for_timeout(wait_ms)
+    await page.mouse.move(random.randint(120, 500), random.randint(120, 420))
+    await page.evaluate("window.scrollTo(0, Math.min(450, document.body.scrollHeight || 0));")
+    await page.wait_for_timeout(random.randint(250, 700))
+
+
+async def _extract_with_fallback(page: "Page", timeout_sec: int) -> str:
+    # Some pages render legal text after delayed JS execution.
+    baseline = await page.evaluate("() => document.body ? document.body.innerText : ''")
+    if baseline and baseline.strip():
+        return baseline
+
+    extra_wait_ms = min(12000, max(2500, int(timeout_sec * 200)))
+    await page.wait_for_timeout(extra_wait_ms)
+
+    text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+    if text and text.strip():
+        return text
+
+    return await page.evaluate("() => document.documentElement ? document.documentElement.innerText : ''")
+
+
+async def _looks_like_bot_block(page: "Page") -> bool:
+    title = (await page.title()).lower()
+    body_text = await page.evaluate("() => (document.body ? document.body.innerText : '')")
+    sample = f"{title}\n{body_text[:2000]}".lower()
+    return _looks_like_bot_block_text(sample)
+
+
+def _looks_like_bot_block_text(sample: str) -> bool:
+    markers = (
+        "captcha",
+        "cloudflare",
+        "ddos-guard",
+        "verify you are human",
+        "if you are not a bot",
+        "are you human",
+        "security check",
+        "access denied",
+        "подтвердите, что вы не робот",
+        "проверка безопасности",
+        "необычный трафик",
+    )
+    return any(marker in sample for marker in markers)
+
+
+def _safe_decode(data: bytes) -> str:
+    try:
+        return data.decode("utf-8", errors="ignore").lower()
+    except Exception:
+        return ""

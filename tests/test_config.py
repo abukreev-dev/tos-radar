@@ -18,15 +18,16 @@ class ConfigTests(unittest.TestCase):
             services = load_services(str(path))
             self.assertEqual([s.domain for s in services], ["example.com", "sub.domain.org"])
 
-    def test_duplicate_domain_raises(self) -> None:
+    def test_duplicate_domain_is_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "tos_urls.txt"
             path.write_text(
                 "https://example.com/terms\nhttps://example.com/another\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(ValueError, "Duplicate domain"):
-                load_services(str(path))
+            services = load_services(str(path))
+            self.assertEqual(len(services), 1)
+            self.assertEqual(services[0].url, "https://example.com/terms")
 
     def test_load_proxies_formats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

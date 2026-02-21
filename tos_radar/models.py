@@ -23,6 +23,7 @@ class SourceType(str, Enum):
 
 
 class ErrorCode(str, Enum):
+    BOT_DETECTED = "BOT_DETECTED"
     TIMEOUT = "TIMEOUT"
     NETWORK = "NETWORK"
     PROXY = "PROXY"
