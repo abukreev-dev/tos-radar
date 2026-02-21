@@ -212,7 +212,7 @@
 ### E6-02 Backend+Frontend: soft-delete lifecycle (30 дней)
 
 - Priority: P0
-- Status: DONE (backend, 2026-02-21)
+- Status: DONE (backend, 2026-02-21; recovery-only guard enabled)
 - Что сделать: блок входа в период soft-delete, экран восстановления, восстановление в 1 клик.
 - Depends on: нет
 - Acceptance:
@@ -262,7 +262,7 @@
 ### E8-01 QA: full acceptance pass на staging
 
 - Priority: P0
-- Status: IN PROGRESS (backend smoke automated, 2026-02-21)
+- Status: IN PROGRESS (backend smoke automated and green, 2026-02-21)
 - Что сделать: полный прогон чеклиста из `docs/v1_scope_checklist_2026-02-21.md`.
 - Depends on: E1..E7
 - Acceptance:

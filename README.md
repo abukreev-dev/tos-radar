@@ -23,6 +23,39 @@
 - Классификация изменений: `NOISE`, `MINOR`, `MAJOR` + `change_ratio`.
 - В отчете есть блок `Suspicious CHANGED`.
 
+## Cabinet Backend API (MVP)
+
+Поднять API:
+```bash
+make db-migrate
+make api-run
+```
+
+Health-check:
+- `GET /api/v1/health`
+
+Базовые endpoint'ы кабинета:
+- `GET /api/v1/notification-settings`
+- `POST /api/v1/notification-settings`
+- `POST /api/v1/telegram/link/start`
+- `POST /api/v1/telegram/link/confirm`
+- `POST /api/v1/telegram/unlink`
+- `POST /api/v1/telegram/disconnected`
+- `POST /api/v1/telegram/test-send`
+- `POST /api/v1/security/sessions/create`
+- `POST /api/v1/security/revoke-all-sessions`
+- `GET /api/v1/security/active-sessions`
+- `POST /api/v1/account/soft-delete/start`
+- `POST /api/v1/account/soft-delete/restore`
+- `GET /api/v1/account/access-state`
+
+Авторизация (MVP):
+- Для защищенных endpoint'ов обязателен заголовок `X-Session-Id`.
+- После `revoke-all-sessions` старые `session_id` становятся невалидными.
+- В режиме `RECOVERY_ONLY` (soft-delete) разрешены только:
+  - `GET /api/v1/account/access-state`
+  - `POST /api/v1/account/soft-delete/restore`
+
 ## Multi-tenant хранение
 
 Все артефакты разделены по `TENANT_ID`:
@@ -175,6 +208,7 @@ https://example.org/tos.pdf
 ```bash
 make test
 make lint
+make acceptance-smoke
 ```
 
 ## Контекст

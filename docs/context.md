@@ -11,6 +11,20 @@
 - Интервью по UI закрыто (Q/A closed). Новые вопросы не задаем.
 - Для незакрытых деталей действует правило: `deferred post-v1`.
 
+## Backend кабинета (статус на 2026-02-21)
+
+- Хранилище кабинета переведено на `MariaDB` (`pymysql`).
+- Добавлены SQL-миграции (`migrations/001_init_cabinet.sql`) и запуск `make db-migrate`.
+- Поднят минимальный HTTP API (`make api-run`) с health-check `GET /api/v1/health`.
+- Реализованы backend-потоки первой волны:
+  - settings + verify-email restriction;
+  - Telegram link/unlink/disconnected/test-send (rate-limit + transport call);
+  - session revoke при смене пароля;
+  - soft-delete lifecycle (start/restore/access-state).
+- На защищенных endpoint'ах включена проверка `X-Session-Id`.
+- В режиме `RECOVERY_ONLY` разрешены только `access-state` и `restore`.
+- Backend acceptance smoke автоматизирован (`make acceptance-smoke`).
+
 ## Цель
 
 Автоматически мониторить изменения ToS-документов по фиксированным URL, сравнивать с baseline и формировать HTML-отчет.
