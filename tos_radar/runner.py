@@ -88,29 +88,31 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     elapsed = time.perf_counter() - started
                     err = f"Service hard-timeout after {service_hard_timeout}s"
                     LOGGER.error("FAILED domain=%s error=%s", service.domain, err)
-                    return RunEntry(
-                        domain=service.domain,
-                        url=service.url,
-                        status=Status.FAILED,
-                        source_type=None,
-                        duration_sec=elapsed,
-                        error_code=ErrorCode.TIMEOUT,
-                        error=err,
-                        diff_html=None,
-                    )
+                return RunEntry(
+                    domain=service.domain,
+                    url=service.url,
+                    status=Status.FAILED,
+                    source_type=None,
+                    duration_sec=elapsed,
+                    text_length=None,
+                    error_code=ErrorCode.TIMEOUT,
+                    error=err,
+                    diff_html=None,
+                )
                 elapsed = time.perf_counter() - started
                 if not result.ok:
                     LOGGER.error("FAILED domain=%s error=%s", service.domain, result.error)
-                    return RunEntry(
-                        domain=service.domain,
-                        url=service.url,
-                        status=Status.FAILED,
-                        source_type=None,
-                        duration_sec=elapsed,
-                        error_code=result.error_code,
-                        error=result.error,
-                        diff_html=None,
-                    )
+                return RunEntry(
+                    domain=service.domain,
+                    url=service.url,
+                    status=Status.FAILED,
+                    source_type=None,
+                    duration_sec=elapsed,
+                    text_length=None,
+                    error_code=result.error_code,
+                    error=result.error,
+                    diff_html=None,
+                )
 
                 text = normalize_for_storage(result.text)
                 if mode == "init":
@@ -122,6 +124,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         status=Status.NEW,
                         source_type=result.source_type,
                         duration_sec=elapsed,
+                        text_length=len(text),
                         error_code=None,
                         error=None,
                         diff_html=None,
@@ -137,6 +140,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         status=Status.NEW,
                         source_type=result.source_type,
                         duration_sec=elapsed,
+                        text_length=len(text),
                         error_code=None,
                         error=None,
                         diff_html=None,
@@ -152,6 +156,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                         status=Status.CHANGED,
                         source_type=result.source_type,
                         duration_sec=elapsed,
+                        text_length=len(text),
                         error_code=None,
                         error=None,
                         diff_html=diff_html,
@@ -164,6 +169,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.UNCHANGED,
                     source_type=result.source_type,
                     duration_sec=elapsed,
+                    text_length=len(text),
                     error_code=None,
                     error=None,
                     diff_html=None,
@@ -177,6 +183,7 @@ async def _run(mode: str, settings: AppSettings) -> int:
                     status=Status.FAILED,
                     source_type=None,
                     duration_sec=elapsed,
+                    text_length=None,
                     error_code=ErrorCode.UNKNOWN,
                     error=f"Unhandled runner error: {exc}",
                     diff_html=None,

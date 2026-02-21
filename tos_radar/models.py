@@ -85,6 +85,7 @@ class RunEntry:
     status: Status
     source_type: SourceType | None
     duration_sec: float
+    text_length: int | None
     error_code: ErrorCode | None
     error: str | None
     diff_html: str | None
