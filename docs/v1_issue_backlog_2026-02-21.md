@@ -168,6 +168,7 @@
 ### E4-03 Frontend: `Мои сервисы` (поиск + карточка)
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: поиск по домену/названию, порядок по дате подключения, поля карточки (дата, источник, последнее изменение).
 - Depends on: нет
 - Acceptance:
@@ -178,6 +179,7 @@
 ### E4-04 Frontend: удаление сервиса через confirm-модалку
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: единая confirm-модалка и финальное удаление без undo.
 - Depends on: E4-03
 - Acceptance:
@@ -189,6 +191,7 @@
 ### E5-01 Frontend: список `Изменения` + фильтры период/сервис
 
 - Priority: P1
+- Status: DONE (frontend repo `tos-radar-frontend`, 2026-02-21)
 - Что сделать: карточки изменений, пагинация и фильтры (без `change_level` фильтра).
 - Depends on: нет
 - Acceptance:
