@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOS Radar Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   HYBRID THEME
+   Layout:   Sidebar (theme4) + 2-col card grid (theme5)
+   Styling:  Indigo Pro palette (theme1)
+   Header:   White / light (theme7)
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:               #f7f8fc;
+  --surface:          #ffffff;
+  --border:           #e2e8f0;
+  --border-md:        #cbd5e1;
+  --text-primary:     #1a202c;
+  --text-secondary:   #475569;
+  --text-muted:       #94a3b8;
+  --accent:           #6366f1;
+  --accent-dark:      #4f46e5;
+  --accent-light:     #eef2ff;
+  --accent-border:    #c7d2fe;
+  --changed:          #f59e0b;
+  --changed-bg:       #fffbeb;
+  --changed-border:   #fde68a;
+  --changed-text:     #92400e;
+  --unchanged:        #10b981;
+  --unchanged-bg:     #ecfdf5;
+  --unchanged-border: #a7f3d0;
+  --unchanged-text:   #065f46;
+  --failed:           #ef4444;
+  --failed-bg:        #fef2f2;
+  --failed-border:    #fecaca;
+  --failed-text:      #991b1b;
+  --new:              #3b82f6;
+  --new-bg:           #eff6ff;
+  --new-border:       #bfdbfe;
+  --new-text:         #1e40af;
+  --shadow-sm:        0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:        0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg:        0 8px 24px rgba(0,0,0,0.10);
+  --radius:           14px;
+  --sidebar-w:        252px;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.layout { display: flex; min-height: 100vh; }
+
+/* ── Sidebar (theme4 structure, theme1/theme7 colors) ───── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 40;
+}
+
+/* Brand block — white header style (theme7) */
+.sidebar-brand {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+  flex-shrink: 0;
+}
+.brand-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.brand-meta { font-size: 0.68rem; color: var(--text-muted); margin-top: 8px; line-height: 1.7; }
+.brand-meta span { display: block; }
+
+/* Stat summary chips */
+.sidebar-stats {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-chip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.13s, box-shadow 0.13s;
+  user-select: none;
+  border: 1.5px solid transparent;
+}
+.stat-chip:hover { background: var(--bg); }
+.stat-chip.active { border-color: var(--accent-border); background: var(--accent-light); }
+.stat-chip.active.changed  { border-color: var(--changed-border); background: var(--changed-bg); }
+.stat-chip.active.unchanged{ border-color: var(--unchanged-border); background: var(--unchanged-bg); }
+.stat-chip.active.failed   { border-color: var(--failed-border); background: var(--failed-bg); }
+.stat-chip.active.new      { border-color: var(--new-border); background: var(--new-bg); }
+
+.sc-left { display: flex; align-items: center; gap: 9px; }
+.sc-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.sc-dot.all       { background: var(--accent); }
+.sc-dot.changed   { background: var(--changed); }
+.sc-dot.unchanged { background: var(--unchanged); }
+.sc-dot.failed    { background: var(--failed); }
+.sc-dot.new       { background: var(--new); }
+.sc-label { font-size: 0.82rem; font-weight: 500; color: var(--text-secondary); }
+.stat-chip.active .sc-label { font-weight: 600; }
+.stat-chip.active.changed   .sc-label { color: var(--changed-text); }
+.stat-chip.active.unchanged .sc-label { color: var(--unchanged-text); }
+.stat-chip.active.failed    .sc-label { color: var(--failed-text); }
+.stat-chip.active.new       .sc-label { color: var(--new-text); }
+.stat-chip.active.all       .sc-label { color: var(--accent-dark); }
+
+.sc-count {
+  font-size: 0.72rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--bg); color: var(--text-muted);
+  border: 1px solid var(--border);
+  min-width: 28px; text-align: center;
+}
+.stat-chip.active .sc-count { background: var(--accent); color: white; border-color: var(--accent); }
+.stat-chip.active.changed   .sc-count { background: var(--changed); border-color: var(--changed); }
+.stat-chip.active.unchanged .sc-count { background: var(--unchanged); border-color: var(--unchanged); }
+.stat-chip.active.failed    .sc-count { background: var(--failed); border-color: var(--failed); }
+.stat-chip.active.new       .sc-count { background: var(--new); border-color: var(--new); }
+
+/* Search */
+.sidebar-search { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  transition: border-color 0.15s;
+}
+.search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.search-box span { color: var(--text-muted); font-size: 13px; }
+.search-box input {
+  border: none; background: transparent; outline: none;
+  font-size: 0.82rem; color: var(--text-primary); width: 100%;
+  font-family: inherit;
+}
+.search-box input::placeholder { color: var(--text-muted); }
+
+/* Sidebar section label */
+.sidebar-section-title {
+  padding: 14px 18px 6px;
+  font-size: 0.62rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer .mode-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; color: var(--text-muted);
+}
+.mode-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,0.2); }
+
+/* ── Content area ────────────────────────────────────────── */
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar — white (theme7 style) */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.topbar-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+.topbar-count { font-size: 0.78rem; color: var(--text-muted); }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+/* Sort dropdown */
+.sort-select {
+  padding: 6px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg); color: var(--text-secondary);
+  font-size: 0.78rem; font-family: inherit; cursor: pointer;
+  outline: none;
+}
+.sort-select:focus { border-color: var(--accent); }
+
+/* ── Cards grid (theme5 2-column) ────────────────────────── */
+.cards-area { padding: 22px 28px; flex: 1; }
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 14px;
+}
+
+/* Card — Indigo Pro style (theme1) + top bar (theme5) */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: box-shadow 0.18s, transform 0.18s;
+  position: relative;
+}
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Colored top strip (theme5 style) */
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.card.CHANGED::before   { background: linear-gradient(90deg, var(--changed), #fbbf24); }
+.card.UNCHANGED::before { background: linear-gradient(90deg, var(--unchanged), #34d399); }
+.card.FAILED::before    { background: linear-gradient(90deg, var(--failed), #f87171); }
+.card.NEW::before       { background: linear-gradient(90deg, var(--new), #60a5fa); }
+
+/* Card header */
+.card-header {
+  display: flex; align-items: center;
+  padding: 15px 18px 13px;
+  gap: 12px;
+  cursor: pointer;
+}
+.card-header.no-expand { cursor: default; }
+
+/* Status icon block (theme4 style) */
+.card-status-block {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3px; flex-shrink: 0; width: 56px;
+}
+.csb-icon { font-size: 20px; line-height: 1; }
+.csb-label {
+  font-size: 0.58rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  text-align: center; line-height: 1.2;
+}
+.CHANGED  .csb-label { color: var(--changed); }
+.UNCHANGED .csb-label { color: var(--unchanged); }
+.FAILED   .csb-label { color: var(--failed); }
+.NEW      .csb-label { color: var(--new); }
+
+.card-divider { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
+
+/* Card main info */
+.card-info { flex: 1; min-width: 0; }
+.card-domain-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.card-domain-row a {
+  font-size: 0.95rem; font-weight: 700;
+  color: var(--accent-dark); text-decoration: none;
+  transition: color 0.12s;
+}
+.card-domain-row a:hover { color: var(--accent); text-decoration: underline; }
+
+.src-badge {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 2px 6px; border-radius: 4px;
+}
+.src-badge.HTML { background: #eff6ff; color: #1d4ed8; }
+.src-badge.PDF  { background: #fef2f2; color: #dc2626; }
+
+.card-tags { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; align-items: center; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.68rem; font-weight: 600;
+  padding: 3px 8px; border-radius: 6px;
+}
+.tag.dur { background: #f9fafb; color: var(--text-muted); border: 1px solid #e5e7eb; }
+.tag.err { background: var(--failed-bg); color: var(--failed); border: 1px solid var(--failed-border); }
+.tag.meta { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; }
+.tag.chg { background: var(--changed-bg); color: var(--changed-text); border: 1px solid var(--changed-border); }
+.tag.susp { background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe; }
+
+/* Expand button */
+.card-expand { flex-shrink: 0; }
+.exp-btn {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--accent); cursor: pointer;
+  transition: all 0.15s;
+}
+.exp-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+.card.expanded .exp-btn { transform: rotate(180deg); background: var(--accent); color: white; border-color: var(--accent); }
+
+/* Card body */
+.card-body { display: none; border-top: 1px solid var(--border); }
+.card.expanded .card-body { display: block; }
+
+.body-url {
+  padding: 11px 18px;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--border);
+}
+.body-url .url-lbl {
+  font-size: 0.62rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted);
+  font-weight: 700; margin-bottom: 4px;
+}
+.body-url a {
+  font-size: 0.78rem; color: var(--accent);
+  text-decoration: none; word-break: break-all;
+}
+.body-url a:hover { text-decoration: underline; }
+
+.body-error {
+  padding: 11px 18px;
+  background: var(--failed-bg);
+  border-bottom: 1px solid var(--failed-border);
+}
+.body-error .err-lbl {
+  font-size: 0.62rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--failed-text);
+  font-weight: 700; margin-bottom: 5px;
+}
+.err-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem; font-weight: 700;
+  color: var(--failed);
+  background: #fee2e2; display: inline-block;
+  padding: 2px 8px; border-radius: 5px;
+}
+.err-msg { font-size: 0.8rem; color: #7f1d1d; margin-top: 5px; }
+
+/* Diff section */
+.diff-section { padding: 14px 18px; }
+.diff-title {
+  font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--accent-dark); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.diff-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.diff-render table.diff { width: 100%; font-size: 12px; border-collapse: collapse; }
+.diff-render .diff_header { background: #e7e7e7; }
+.diff-render td.diff_next { display: none; }
+.diff-render td.diff_add { background: #d9f7de; }
+.diff-render td.diff_chg { background: #fff5c7; }
+.diff-render td.diff_sub { background: #ffd9d9; }
+.diff-render td, .diff-render th {
+  padding: 6px 8px;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+/* Empty state */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center; padding: 80px 20px;
+  color: var(--text-muted);
+}
+.empty-state .es-icon { font-size: 2.5rem; margin-bottom: 12px; }
+.empty-state p { font-size: 0.88rem; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .diff-render table.diff { display: block; overflow-x: auto; white-space: nowrap; }
+  .cards-area { padding: 16px; }
+  .topbar { padding: 12px 16px; }
+}
+@media (max-width: 640px) {
+  .cards-grid { grid-template-columns: 1fr; }
+  .diff-render table.diff { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-row">
+        <div class="brand-icon">📡</div>
+        <div>
+          <div class="brand-title">TOS Radar</div>
+        </div>
+      </div>
+      <div class="brand-meta" id="sidebar-meta">
+        <span>—</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section-title">Фильтр по статусу</div>
+
+    <div class="sidebar-stats">
+      <div class="stat-chip all active" data-filter="ALL">
+        <div class="sc-left"><div class="sc-dot all"></div><span class="sc-label">Все проверки</span></div>
+        <span class="sc-count" id="sc-all">0</span>
+      </div>
+      <div class="stat-chip changed" data-filter="CHANGED">
+        <div class="sc-left"><div class="sc-dot changed"></div><span class="sc-label">Изменено</span></div>
+        <span class="sc-count" id="sc-changed">0</span>
+      </div>
+      <div class="stat-chip unchanged" data-filter="UNCHANGED">
+        <div class="sc-left"><div class="sc-dot unchanged"></div><span class="sc-label">Без изменений</span></div>
+        <span class="sc-count" id="sc-unchanged">0</span>
+      </div>
+      <div class="stat-chip failed" data-filter="FAILED">
+        <div class="sc-left"><div class="sc-dot failed"></div><span class="sc-label">Ошибка</span></div>
+        <span class="sc-count" id="sc-failed">0</span>
+      </div>
+      <div class="stat-chip new" data-filter="NEW">
+        <div class="sc-left"><div class="sc-dot new"></div><span class="sc-label">Новые</span></div>
+        <span class="sc-count" id="sc-new">0</span>
+      </div>
+    </div>
+
+    <div class="sidebar-search">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="search-input" placeholder="Поиск по домену...">
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="mode-badge">
+        <div class="mode-dot"></div>
+        <span id="mode-label">Mode: —</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── CONTENT ─────────────────────────────────────────── -->
+  <div class="content">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-title">Результаты проверок</span>
+        <span class="topbar-count" id="result-count"></span>
+      </div>
+      <div class="topbar-right">
+        <select class="sort-select" id="sort-select">
+          <option value="default">Порядок по умолчанию</option>
+          <option value="domain">По домену (А–Я)</option>
+          <option value="status">По статусу</option>
+          <option value="duration">По времени</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Cards grid -->
+    <div class="cards-area">
+      <div class="cards-grid" id="cards-grid"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const REPORT_DATA = __REPORT_DATA_JSON__;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let activeFilters = new Set(['ALL']);
+let searchQuery = '';
+let sortMode = 'default';
+
+const ICONS  = { CHANGED:'🔄', UNCHANGED:'✅', FAILED:'❌', NEW:'🆕' };
+const LABELS = { CHANGED:'Изменено', UNCHANGED:'Без изм.', FAILED:'Ошибка', NEW:'Новый' };
+
+function getStats(items) {
+  return {
+    total:     items.length,
+    changed:   items.filter(i => i.status === 'CHANGED').length,
+    unchanged: items.filter(i => i.status === 'UNCHANGED').length,
+    failed:    items.filter(i => i.status === 'FAILED').length,
+    newly:     items.filter(i => i.status === 'NEW').length
+  };
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const s = getStats(REPORT_DATA.items);
+
+  // Sidebar meta
+  document.getElementById('sidebar-meta').innerHTML =
+    `<span>Generated: ${REPORT_DATA.generated}</span><span>Mode: ${REPORT_DATA.mode}</span>`;
+  document.getElementById('mode-label').textContent = `Mode: ${REPORT_DATA.mode}`;
+
+  // Counts
+  document.getElementById('sc-all').textContent       = s.total;
+  document.getElementById('sc-changed').textContent   = s.changed;
+  document.getElementById('sc-unchanged').textContent = s.unchanged;
+  document.getElementById('sc-failed').textContent    = s.failed;
+  document.getElementById('sc-new').textContent       = s.newly;
+
+  // Filter clicks — multi-select
+  document.querySelectorAll('.stat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const f = chip.dataset.filter;
+      if (f === 'ALL') {
+        activeFilters = new Set(['ALL']);
+        document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        activeFilters.delete('ALL');
+        document.querySelector('.stat-chip.all').classList.remove('active');
+        if (activeFilters.has(f)) {
+          activeFilters.delete(f);
+          chip.classList.remove('active');
+          if (!activeFilters.size) {
+            activeFilters.add('ALL');
+            document.querySelector('.stat-chip.all').classList.add('active');
+          }
+        } else {
+          activeFilters.add(f);
+          chip.classList.add('active');
+        }
+      }
+      render();
+    });
+  });
+
+  // Search
+  document.getElementById('search-input').addEventListener('input', e => {
+    searchQuery = e.target.value.toLowerCase();
+    render();
+  });
+
+  // Sort
+  document.getElementById('sort-select').addEventListener('change', e => {
+    sortMode = e.target.value;
+    render();
+  });
+
+  render();
+});
+
+// ── Filter + sort ─────────────────────────────────────────────────────────────
+function getFiltered() {
+  let items = REPORT_DATA.items.filter(i =>
+    (activeFilters.has('ALL') || activeFilters.has(i.status)) &&
+    (!searchQuery || i.domain.toLowerCase().includes(searchQuery) || i.url.toLowerCase().includes(searchQuery))
+  );
+  if (sortMode === 'domain') {
+    items = [...items].sort((a,b) => a.domain.localeCompare(b.domain));
+  } else if (sortMode === 'status') {
+    const order = { FAILED:0, CHANGED:1, NEW:2, UNCHANGED:3 };
+    items = [...items].sort((a,b) => (order[a.status]??9) - (order[b.status]??9));
+  } else if (sortMode === 'duration') {
+    items = [...items].sort((a,b) => parseFloat(b.duration) - parseFloat(a.duration));
+  }
+  return items;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const items = getFiltered();
+  const grid  = document.getElementById('cards-grid');
+  document.getElementById('result-count').textContent =
+    `${items.length} из ${REPORT_DATA.items.length}`;
+
+  if (!items.length) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="es-icon">🔎</div>
+        <p>Ничего не найдено по выбранным фильтрам</p>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(renderCard).join('');
+
+  grid.querySelectorAll('.card-header:not(.no-expand)').forEach(h => {
+    h.addEventListener('click', () => h.closest('.card').classList.toggle('expanded'));
+  });
+}
+
+function renderCard(item) {
+  const hasDiff = !!item.diff_html;
+  const hasBody = hasDiff || item.error || item.error_code;
+  const icon    = ICONS[item.status]  || '❓';
+  const label   = LABELS[item.status] || item.status;
+  const source = item.source ? esc(item.source) : '';
+  const url = escAttr(item.url || '#');
+  const domain = esc(item.domain || '-');
+  const duration = esc(item.duration || '-');
+  const errorCode = item.error_code ? esc(item.error_code) : '';
+  const error = item.error ? esc(item.error) : '';
+  const textLength = Number.isInteger(item.text_length) ? item.text_length : null;
+  const changeLevel = item.change_level ? esc(item.change_level) : '';
+  const changeRatio = Number.isFinite(item.change_ratio) ? item.change_ratio.toFixed(4) : null;
+
+  return `
+<div class="card ${item.status}">
+  <div class="card-header${hasBody ? '' : ' no-expand'}">
+    <div class="card-status-block">
+      <div class="csb-icon">${icon}</div>
+      <div class="csb-label">${label}</div>
+    </div>
+    <div class="card-divider"></div>
+    <div class="card-info">
+      <div class="card-domain-row">
+        <a href="${url}" target="_blank" rel="noopener noreferrer">${domain}</a>
+        ${item.source ? `<span class="src-badge ${source}">${source}</span>` : ''}
+      </div>
+      <div class="card-tags">
+        <span class="tag dur">⏱ ${duration}</span>
+        ${textLength !== null ? `<span class="tag meta">🧾 ${textLength}</span>` : ''}
+        ${changeLevel ? `<span class="tag chg">Δ ${changeLevel}${changeRatio !== null ? ` ${changeRatio}` : ''}</span>` : ''}
+        ${item.suspicious ? `<span class="tag susp">Suspicious</span>` : ''}
+        ${errorCode ? `<span class="tag err">⚠ ${errorCode}</span>` : ''}
+      </div>
+    </div>
+    ${hasBody ? `<div class="card-expand"><div class="exp-btn">▼</div></div>` : ''}
+  </div>
+  ${hasBody ? `
+  <div class="card-body">
+    <div class="body-url">
+      <div class="url-lbl">URL документа</div>
+      <a href="${url}" target="_blank" rel="noopener noreferrer">${esc(item.url || '-')}</a>
+    </div>
+    ${(item.error || item.error_code) ? `
+    <div class="body-error">
+      <div class="err-lbl">Ошибка</div>
+      ${errorCode ? `<div class="err-code">${errorCode}</div>` : ''}
+      ${error ? `<div class="err-msg">${error}</div>` : ''}
+    </div>` : ''}
+    ${hasDiff ? `
+    <div class="diff-section">
+      <div class="diff-title">Изменения контента</div>
+      <div class="diff-render">${item.diff_html}</div>
+    </div>` : ''}
+  </div>` : ''}
+</div>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escAttr(s) {
+  return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>

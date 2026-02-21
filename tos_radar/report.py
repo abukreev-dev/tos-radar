@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
-from html import escape
 from pathlib import Path
 
 from tos_radar.change_classifier import is_suspicious_changed
 from tos_radar.models import RunEntry
+
+_REPORT_DATA_MARKER = "__REPORT_DATA_JSON__"
 
 
 def write_report(entries: list[RunEntry], mode: str, tenant_id: str) -> Path:
@@ -26,97 +28,44 @@ def find_latest_report(tenant_id: str) -> Path | None:
 
 
 def _render(entries: list[RunEntry], mode: str) -> str:
-    suspicious = [
-        e
-        for e in entries
-        if e.status.value == "CHANGED"
-        and e.change_level is not None
-        and e.change_ratio is not None
-        and is_suspicious_changed(e.change_level, e.change_ratio, e.text_length)
-    ]
-    rows = []
-    for entry in entries:
-        diff_block = entry.diff_html or ""
-        error = escape(entry.error or "")
-        error_code = entry.error_code.value if entry.error_code else "-"
-        source = entry.source_type.value if entry.source_type else "-"
-        text_length = str(entry.text_length) if entry.text_length is not None else "-"
-        change_level = entry.change_level.value if entry.change_level else "-"
-        change_ratio = f"{entry.change_ratio:.4f}" if entry.change_ratio is not None else "-"
-        rows.append(
-            f"""
-            <section class="card status-{entry.status.value.lower()}">
-              <div class="meta">
-                <div><b>domain</b>: {escape(entry.domain)}</div>
-                <div><b>url</b>: <a href="{escape(entry.url)}">{escape(entry.url)}</a></div>
-                <div><b>status</b>: {entry.status.value}</div>
-                <div><b>source</b>: {source}</div>
-                <div><b>duration</b>: {entry.duration_sec:.2f}s</div>
-                <div><b>text_length</b>: {text_length}</div>
-                <div><b>change_level</b>: {change_level}</div>
-                <div><b>change_ratio</b>: {change_ratio}</div>
-                <div><b>error_code</b>: {error_code}</div>
-                <div><b>error</b>: {error or "-"}</div>
-              </div>
-              <div class="diff">{diff_block}</div>
-            </section>
-            """
-        )
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TOS Radar Report</title>
-  <style>
-    body {{ font-family: 'Courier New', monospace; background: #f7f4ef; color: #222; margin: 0; }}
-    header {{ background: #1f4e5f; color: #fff; padding: 16px 20px; }}
-    main {{ padding: 16px; display: grid; gap: 12px; }}
-    .card {{ background: #fff; border: 1px solid #ddd; border-left: 6px solid #999; padding: 12px; }}
-    .status-changed {{ border-left-color: #b11f1f; }}
-    .status-unchanged {{ border-left-color: #207531; }}
-    .status-failed {{ border-left-color: #7a4d00; }}
-    .status-new {{ border-left-color: #0e4b8a; }}
-    .meta {{ display: grid; gap: 4px; margin-bottom: 8px; }}
-    table.diff {{ width: 100%; font-size: 12px; border-collapse: collapse; }}
-    .diff_header {{ background: #e7e7e7; }}
-    td.diff_next {{ display: none; }}
-    td.diff_add {{ background: #d9f7de; }}
-    td.diff_chg {{ background: #fff5c7; }}
-    td.diff_sub {{ background: #ffd9d9; }}
-  </style>
-</head>
-<body>
-  <header>
-    <h1>TOS Radar Report</h1>
-    <div>Generated: {datetime.now().isoformat(timespec="seconds")}</div>
-    <div>Mode: {escape(mode)}</div>
-  </header>
-  <main>
-    {_render_suspicious(suspicious)}
-    {''.join(rows)}
-  </main>
-</body>
-</html>"""
+    template = _load_template()
+    payload = {
+        "generated": datetime.now().isoformat(timespec="seconds"),
+        "mode": mode,
+        "items": [_entry_to_item(entry) for entry in entries],
+    }
+    return template.replace(_REPORT_DATA_MARKER, json.dumps(payload, ensure_ascii=False))
 
 
-def _render_suspicious(entries: list[RunEntry]) -> str:
-    if not entries:
-        return ""
-    items = []
-    for entry in entries:
-        ratio = f"{entry.change_ratio:.4f}" if entry.change_ratio is not None else "-"
-        items.append(
-            f"<li>{escape(entry.domain)} "
-            f"(level={entry.change_level.value if entry.change_level else '-'}, "
-            f"ratio={ratio}, "
-            f"text_length={entry.text_length if entry.text_length is not None else '-'})</li>"
-        )
-    return (
-        '<section class="card" style="border-left-color:#8a2be2;">'
-        "<h3>Suspicious CHANGED</h3>"
-        "<ul>"
-        + "".join(items)
-        + "</ul></section>"
+def _entry_to_item(entry: RunEntry) -> dict[str, object]:
+    suspicious = (
+        entry.status.value == "CHANGED"
+        and entry.change_level is not None
+        and entry.change_ratio is not None
+        and is_suspicious_changed(entry.change_level, entry.change_ratio, entry.text_length)
     )
+    return {
+        "domain": entry.domain,
+        "url": entry.url,
+        "status": entry.status.value,
+        "source": entry.source_type.value if entry.source_type else None,
+        "duration": f"{entry.duration_sec:.2f}s",
+        "error_code": entry.error_code.value if entry.error_code else None,
+        "error": entry.error,
+        "diff_html": entry.diff_html,
+        "text_length": entry.text_length,
+        "change_level": entry.change_level.value if entry.change_level else None,
+        "change_ratio": entry.change_ratio,
+        "suspicious": suspicious,
+    }
+
+
+def _load_template() -> str:
+    local_template = Path("report.html")
+    package_root_template = Path(__file__).resolve().parents[1] / "report.html"
+    template_path = local_template if local_template.exists() else package_root_template
+    template = template_path.read_text(encoding="utf-8")
+    if _REPORT_DATA_MARKER not in template:
+        msg = f"Report template is missing marker {_REPORT_DATA_MARKER}: {template_path}"
+        raise ValueError(msg)
+    return template
